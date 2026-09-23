@@ -1,0 +1,1306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Dry-type transformer design calculator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#E9EDF0; --panel:#F8FAFB; --sheet:#FFFFFF; --ink:#17212B; --ink2:#4A5866; --rule:#C3CCD5; --rule2:#E1E6EB;
+  --accent:#0F5E5C; --accent-ink:#FFFFFF; --lv:#C08A1E; --hv:#9B4A26; --core:#5C6B78; --ok:#2E7D4F; --bad:#B23A2E; --warnbg:#FBEDE9;
+  --fh:'Barlow Condensed','Arial Narrow',Arial,sans-serif; --fb:'Barlow','Segoe UI',Arial,sans-serif;
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){ --bg:#141A20; --panel:#1B232B; --sheet:#F7F8F9; --ink:#E6EBEF; --ink2:#9AA8B5; --rule:#34414D; --rule2:#26313B; --accent:#3FA7A3; --accent-ink:#0B1A1A; --warnbg:#3A2320; } }
+:root[data-theme="dark"]{ --bg:#141A20; --panel:#1B232B; --sheet:#F7F8F9; --ink:#E6EBEF; --ink2:#9AA8B5; --rule:#34414D; --rule2:#26313B; --accent:#3FA7A3; --accent-ink:#0B1A1A; --warnbg:#3A2320; }
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--fb);font-size:15px;line-height:1.45;font-variant-numeric:tabular-nums}
+header.top{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:20px 24px 14px;border-bottom:2px solid var(--ink)}
+header.top h1{font-family:var(--fh);font-weight:700;font-size:clamp(26px,4vw,40px);line-height:1;margin:0;letter-spacing:.2px}
+header.top p{margin:6px 0 0;color:var(--ink2);max-width:62ch}
+.presets{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.btn.sm{padding:5px 9px;font-size:13px}
+.tabs.mode button{padding:9px 16px;font-size:15px}
+button{font:inherit;cursor:pointer}
+.btn{border:1.5px solid var(--ink);background:transparent;color:var(--ink);padding:7px 12px;border-radius:3px;font-weight:600;font-size:14px}
+.btn:hover{background:var(--rule2)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{filter:brightness(1.08)}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.layout{display:grid;grid-template-columns:minmax(300px,380px) 1fr;gap:0;min-height:calc(100vh - 100px)}
+@media (max-width:900px){.layout{grid-template-columns:1fr}}
+@media (max-width:560px){.kpis{grid-template-columns:repeat(2,1fr)}}
+aside.form{background:var(--panel);border-right:1px solid var(--rule);padding:16px 18px 40px}
+@media (max-width:900px){aside.form{border-right:0;border-bottom:1px solid var(--rule)}}
+fieldset{border:0;margin:0 0 18px;padding:0}
+legend{font-family:var(--fh);font-weight:600;font-size:19px;padding:0;margin-bottom:8px;display:flex;gap:8px;align-items:baseline}
+legend small{font-family:var(--fb);font-weight:400;font-size:12.5px;color:var(--ink2)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px}
+.full{grid-column:1/-1}
+label{display:flex;flex-direction:column;gap:3px;font-size:13px;color:var(--ink2)}
+label b{color:var(--ink);font-weight:600}
+label .req{color:var(--bad)}
+input,select{font:inherit;font-size:14.5px;color:var(--ink);background:var(--bg);border:1px solid var(--rule);border-radius:3px;padding:6px 8px;width:100%;min-width:0}
+input::placeholder{color:var(--ink2);opacity:.75}
+details{border-top:1px solid var(--rule);padding-top:10px}
+summary{font-family:var(--fh);font-weight:600;font-size:18px;cursor:pointer;margin-bottom:8px}
+.hint{font-size:12.5px;color:var(--ink2);margin:6px 0 0}
+main{padding:16px 22px 60px;min-width:0}
+.bar{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:14px}
+.tabs{display:flex;gap:0;border:1.5px solid var(--ink);border-radius:3px;overflow:hidden}
+.tabs button{border:0;background:transparent;color:var(--ink);padding:7px 14px;font-weight:600;font-size:14px}
+.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg)}
+.exports{display:flex;gap:8px;flex-wrap:wrap}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--rule);border:1px solid var(--rule);margin-bottom:14px}
+.kpi{background:var(--panel);padding:10px 12px}
+.kpi span{display:block;font-size:12.5px;color:var(--ink2)}
+.kpi strong{font-family:var(--fh);font-size:26px;font-weight:600;line-height:1.1}
+.kpi em{font-style:normal;font-size:12.5px;color:var(--ink2);margin-left:3px}
+.kpi.bad strong{color:var(--bad)}
+.warns{margin:0 0 14px;padding:10px 14px;background:var(--warnbg);border-left:4px solid var(--bad);display:none}
+.warns.on{display:block}
+.warns ul{margin:4px 0 0;padding-left:18px}
+.okline{margin:0 0 14px;color:var(--ok);font-weight:600;display:none}
+.okline.on{display:block}
+.drawing{background:var(--panel);border:1px solid var(--rule);padding:10px 12px 6px;margin-bottom:14px;overflow-x:auto}
+.drawing h2,.panel h2{font-family:var(--fh);font-size:19px;font-weight:600;margin:0 0 6px}
+.drawing svg{display:block;width:100%;height:auto;min-width:520px;max-height:460px}
+/* the paper sheet */
+.sheet{background:var(--sheet);color:#17212B;border:1px solid #9AA6B2;box-shadow:0 1px 0 #9AA6B2;padding:14px;overflow-x:auto}
+.sheet h3{font-family:var(--fh);font-size:17px;font-weight:700;margin:14px 0 4px;color:#17212B;border-bottom:1.5px solid #17212B;padding-bottom:2px}
+.sheet h3:first-child{margin-top:0}
+.sheet table{border-collapse:collapse;width:100%;font-size:13px}
+.sheet td,.sheet th{border:1px solid #AEB8C2;padding:3px 7px;text-align:left;vertical-align:top}
+.sheet th{background:#EEF1F4;font-weight:600}
+.sheet td.n{text-align:right}
+.sheet .cols{display:grid;grid-template-columns:3fr 2fr;gap:14px}
+@media (max-width:1150px){.sheet .cols{grid-template-columns:1fr}}
+.titleblock{display:grid;grid-template-columns:repeat(4,1fr);border:1.5px solid #17212B;font-size:13px}
+.titleblock div{padding:4px 8px;border-right:1px solid #AEB8C2;border-bottom:1px solid #AEB8C2}
+.titleblock div span{display:block;font-size:11px;color:#56616C}
+.titleblock .big{grid-column:1/-1;font-family:var(--fh);font-size:22px;font-weight:700;border-bottom:1.5px solid #17212B}
+@media (max-width:640px){.titleblock{grid-template-columns:1fr 1fr}}
+.steps table{font-size:13px}
+.steps td:first-child{width:36px;text-align:center;font-weight:600}
+.steps td.r{white-space:nowrap;font-weight:600}
+.steps .formula{color:#3E4A56}
+.steps .note{display:block;color:#56616C;font-size:12px}
+.steps tr.grp td{background:#17212B;color:#fff;font-family:var(--fh);font-size:15px;font-weight:600;letter-spacing:.3px}
+[hidden]{display:none!important}
+.toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:3px;font-weight:600;opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.on{opacity:1}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}}
+.grid4{display:grid;grid-template-columns:1.1fr 1fr 1fr 1.2fr;gap:8px}
+.pair{display:flex;gap:4px}.pair input{min-width:0}
+.subhead{font-size:13px;font-weight:600;margin:10px 0 4px;color:var(--ink)}
+.filebtn{display:inline-flex;align-items:center;cursor:pointer;color:var(--ink);flex-direction:row}
+.filebtn:focus-within{outline:3px solid var(--accent);outline-offset:2px}
+.saved{border:1px solid var(--rule);padding:8px 10px 10px;margin-bottom:12px;background:var(--bg)}
+.saved .subhead{margin-top:0}
+.saverow{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}.saverow input,.saverow select{flex:1;min-width:120px}
+</style>
+</head>
+<body>
+<header class="top">
+  <div>
+    <h1>Dry-type transformer design calculator</h1>
+    <p>Enter the requirement and the design sheet fills itself, with a compliance check and PDF or Excel download.</p>
+  </div>
+  <div class="tabs mode" role="tablist" aria-label="Core type">
+    <button role="tab" aria-selected="false" data-mode="round">Round stepped core</button>
+    <button role="tab" aria-selected="true" data-mode="rect">Rectangular core, LV/LV</button>
+  </div>
+</header>
+
+<div class="layout" id="layout-round" hidden>
+<aside class="form">
+  <div class="presets" aria-label="Load a reference design">
+    <button class="btn sm" data-preset="p500">500 kVA Cu ref.</button>
+    <button class="btn sm" data-preset="p600">600 kVA Al ref.</button>
+    <button class="btn sm" data-preset="p1600">1600 kVA Cu</button>
+    <button class="btn sm" data-preset="blank">Defaults</button>
+  </div>
+<form id="f" autocomplete="off" onsubmit="return false">
+  <fieldset>
+    <legend>Rating <small><span class="req">*</span> required</small></legend>
+    <div class="grid2">
+      <label><b>Capacity, kVA <span class="req">*</span></b><input name="kVA" type="number" min="5" step="any" required></label>
+      <label><b>Frequency, Hz <span class="req">*</span></b><select name="freq"><option>50</option><option>60</option></select></label>
+      <label><b>HV line voltage, V <span class="req">*</span></b><input name="hvV" type="number" min="100" step="any" required></label>
+      <label><b>LV line voltage, V <span class="req">*</span></b><input name="lvV" type="number" min="50" step="any" required></label>
+      <label><b>Vector group <span class="req">*</span></b><select name="vg">
+        <option>Dyn11</option><option>Dyn1</option><option>Dyn5</option><option>Ynd11</option><option>Ynd1</option><option>Yyn0</option><option>Dd0</option></select></label>
+      <label><b>Insulation class <span class="req">*</span></b><select name="insClass"><option>B</option><option selected>F</option><option>H</option></select></label>
+      <label><b>LV conductor <span class="req">*</span></b><select name="lvMat"><option value="Cu">Copper</option><option value="Al">Aluminium</option></select></label>
+      <label><b>HV conductor <span class="req">*</span></b><select name="hvMat"><option value="Cu">Copper</option><option value="Al">Aluminium</option></select></label>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Design choices <small>defaults are typical</small></legend>
+    <div class="grid2">
+      <label><b>Constant k</b><input name="k" type="number" step="0.001" min="0.2" max="1"></label>
+      <label><b>Flux density, T</b><input name="B" type="number" step="0.01" min="1" max="1.8"></label>
+      <label><b>LV current density, A/mm²</b><input name="Jlv" type="number" step="0.01" min="0.5" max="4"></label>
+      <label><b>HV current density, A/mm²</b><input name="Jhv" type="number" step="0.01" min="0.5" max="4"></label>
+      <label><b>Tap plus, %</b><input name="tapPlus" type="number" step="0.5" min="0"></label>
+      <label><b>Tap minus, %</b><input name="tapMinus" type="number" step="0.5" min="0"></label>
+      <label><b>Tap step, %</b><input name="tapStep" type="number" step="0.5" min="0"></label>
+      <label><b>Target impedance, %</b><input name="zTarget" type="number" step="0.1" min="0"></label>
+      <label><b>Core grade</b><select name="grade"><option value="M4-0.27">CRGO M4 0.27</option><option value="M3-0.23">CRGO M3 0.23</option><option value="23ZDMH-0.23">23ZDMH 0.23</option></select></label>
+      <label><b>Core joint</b><select name="joint"><option value="mitred">Mitred</option><option value="step">Step-lap</option></select></label>
+      <label><b>Loss reference temp, °C</b><input name="refTemp" type="number" step="1"></label>
+      <label><b>Enclosure</b><select name="enclosure"><option value="1">IP23 enclosure</option><option value="0">Without</option></select></label>
+    </div>
+  </fieldset>
+
+  <details id="adv">
+    <summary>Advanced — leave blank for automatic sizing</summary>
+    <div class="grid2">
+      <label><b>Window height, mm</b><input name="window" type="number" placeholder="auto"></label>
+      <label><b>Core diameter, mm</b><input name="coreDia" type="number" placeholder="auto"></label>
+      <label><b>LV end clearance, mm</b><input name="lvEnd" type="number" placeholder="auto"></label>
+      <label><b>HV end clearance, mm</b><input name="hvEnd" type="number" placeholder="auto"></label>
+      <label><b>LV turns / phase</b><input name="lvTurns" type="number" placeholder="auto"></label>
+      <label><b>LV layers</b><input name="lvLayers" type="number" placeholder="auto"></label>
+      <label><b>LV axial parallels</b><input name="lvAx" type="number" placeholder="auto"></label>
+      <label><b>LV radial parallels</b><input name="lvRad" type="number" placeholder="auto"></label>
+      <label><b>LV transposition, mm</b><input name="lvTransp" type="number" placeholder="30"></label>
+      <label><b>LV air ducts</b><input name="lvDucts" type="number" placeholder="auto"></label>
+      <label><b>LV duct width, mm</b><input name="lvDuctT" type="number" placeholder="auto"></label>
+      <label><b>Core to LV, mm</b><input name="coreLV" type="number" placeholder="10"></label>
+      <label><b>HV coils / phase</b><input name="hvCoils" type="number" placeholder="auto"></label>
+      <label><b>HV conductor</b><select name="hvCond"><option value="auto">Auto</option><option value="round">Round wire</option><option value="strip">Strip</option></select></label>
+      <label><b>HV air ducts</b><input name="hvDucts" type="number" placeholder="auto"></label>
+      <label><b>HV duct width, mm</b><input name="hvDuctT" type="number" placeholder="12"></label>
+      <label><b>LV–HV gap, mm</b><input name="lvhvGap" type="number" placeholder="auto"></label>
+      <label><b>HV phase gap, mm</b><input name="phaseGap" type="number" placeholder="auto"></label>
+      <label><b>HV coil-to-coil gap, mm</b><input name="hvCoilGap" type="number" placeholder="12"></label>
+      <label><b>HV inter-layer min, mm</b><input name="hvMinIns" type="number" step="0.01" placeholder="0.05"></label>
+      <label><b>LV conductor insulation, mm</b><input name="lvIns" type="number" step="0.01" placeholder="0.3"></label>
+      <label><b>HV round insulation, mm</b><input name="hvInsRound" type="number" step="0.01" placeholder="0.2"></label>
+      <label><b>HV strip insulation, mm</b><input name="hvInsStrip" type="number" step="0.01" placeholder="0.44"></label>
+      <label><b>Enclosure clearance, mm</b><input name="enclClr" type="number" placeholder="200"></label>
+    </div>
+    <p class="hint">Automatic rules follow the step method: clearances by HV insulation level (IS 11171), duct width by winding length, LV parallels chosen for the fewest strips with height ≤ 5 mm (Cu) or 6 mm (Al).</p>
+  </details>
+
+  <details open>
+    <summary>Sheet header</summary>
+    <div class="grid2">
+      <label class="full"><b>Party / customer</b><input name="party"></label>
+      <label><b>Work order</b><input name="wo"></label>
+      <label><b>Design ref.</b><input name="ref"></label>
+      <label><b>Designed by</b><input name="by"></label>
+      <label><b>Approved by</b><input name="appr"></label>
+    </div>
+  </details>
+</form>
+</aside>
+
+<main>
+  <div class="bar">
+    <div class="tabs" role="tablist">
+      <button role="tab" aria-selected="true" data-tab="sheet">Design sheet</button>
+      <button role="tab" aria-selected="false" data-tab="steps">Step-by-step</button>
+    </div>
+    <div class="exports">
+      <button class="btn primary" id="dlPdf">Download PDF</button>
+      <button class="btn" id="dlXlsx">Download Excel</button>
+    </div>
+  </div>
+  <div class="kpis" id="kpis"></div>
+  <div class="warns" id="warns"><strong>Check these before release</strong><ul></ul></div>
+  <p class="okline" id="okline">All checks pass: flux, current densities, gradients and impedance are within limits.</p>
+  <section id="tab-sheet">
+    <div class="drawing"><h2>Section through one limb, to scale</h2><div id="svgwrap"></div></div>
+    <div class="sheet" id="sheet"></div>
+  </section>
+  <section id="tab-steps" hidden>
+    <div class="sheet steps" id="steps"></div>
+  </section>
+</main>
+</div>
+<div class="layout" id="layout-rect">
+<aside class="form">
+  <div class="presets" aria-label="Load a reference design">
+    <button class="btn sm" data-rpreset="sheet70">70 kVA — your design sheet</button>
+    <button class="btn sm" data-rpreset="auto70">70 kVA — auto design</button>
+    <label class="btn sm filebtn">Import requirement sheet (.xlsx)<input type="file" id="reqFile" accept=".xlsx,.xls,.csv" hidden></label>
+  </div>
+  <div class="saved" aria-label="Saved designs">
+    <p class="subhead">Saved designs</p>
+    <div class="saverow"><input id="saveName" placeholder="Name, e.g. 8 kVA round wire" aria-label="Design name"><button type="button" class="btn sm primary" id="saveBtn">Save</button></div>
+    <div class="saverow"><select id="savedList" aria-label="Saved designs"><option value="">No saved designs yet</option></select><button type="button" class="btn sm" id="loadBtn">Load</button><button type="button" class="btn sm" id="delBtn">Delete</button></div>
+    <div class="saverow"><button type="button" class="btn sm" id="expBtn">Export designs (.json)</button><label class="btn sm filebtn">Load design file (.json or Excel)<input type="file" id="impFile" accept=".json,.xlsx" hidden></label></div>
+  </div>
+  <p class="hint" id="reqStatus">Requirement: TRX 70 kVA, 433 V / 400 V, Al, Dyn11 (built in).</p>
+<form id="rf" autocomplete="off" onsubmit="return false">
+  <fieldset>
+    <legend>Requirement <small><span class="req">*</span> from the requirement sheet</small></legend>
+    <div class="grid2">
+      <label><b>Rating, kVA <span class="req">*</span></b><input name="kVA" type="number" step="any" min="1"></label>
+      <label><b>Frequency, Hz <span class="req">*</span></b><select name="freq"><option>50</option><option>60</option></select></label>
+      <label><b>Primary voltage, V <span class="req">*</span></b><input name="priV" type="number" step="any"></label>
+      <label><b>Secondary voltage, V <span class="req">*</span></b><input name="secV" type="number" step="any"></label>
+      <label><b>Vector group <span class="req">*</span></b><select name="vg"><option>Dyn11</option><option>Dyn1</option><option>Dyn5</option><option>Yyn0</option><option>Ynd11</option><option>Yd11</option><option>Dd0</option><option>Dzn0</option></select></label>
+      <label><b>Winding material <span class="req">*</span></b><select name="mat"><option value="Al">Aluminium</option><option value="Cu">Copper</option></select></label>
+      <label><b>Impedance, % <span class="req">*</span></b><input name="zTarget" type="number" step="0.01"></label>
+      <label><b>Tolerance +% / −%</b><span class="pair"><input name="zTolPlus" type="number" step="0.5" aria-label="plus tolerance"><input name="zTolMinus" type="number" step="0.5" aria-label="minus tolerance"></span></label>
+      <label><b>Efficiency above, % <span class="req">*</span></b><input name="effMin" type="number" step="0.1"></label>
+      <label><b>Rise limit, K <span class="req">*</span></b><input name="riseLimit" type="number" step="1"></label>
+      <label><b>Ambient, °C</b><input name="amb" type="number" step="1"></label>
+      <label><b>Loss reference, °C</b><select name="windTemp"><option>115</option><option>90</option><option>75</option><option>120</option><option>145</option></select></label>
+      <label><b>Insulation class</b><select name="insClass"><option>H</option><option>F</option><option>B</option></select></label>
+      <label><b>Core grade</b><select name="grade"><option value="M4-27">CRGO M4 0.27</option><option value="MOH-23">CRGO MOH 0.23</option><option value="CRNO-35">CRNO 0.35</option></select></label>
+      <label><b>Noise max, dB</b><input name="noiseMax" type="number" step="1"></label>
+      <label><b>Enclosure</b><select name="enclosure"><option value="0">Not required</option><option value="1">CRCA enclosure</option></select></label>
+    </div>
+  </fieldset>
+  <fieldset>
+    <legend>Design <small>blank = chosen automatically</small></legend>
+    <div class="grid2">
+      <label class="full"><b>Calculation basis</b><select name="basis"><option value="sheet">As per design sheet (matches CAL1)</option><option value="refined">Refined (revised V/t, interpolated tables, full stray formula)</option></select></label>
+      <label><b>Constant K</b><input name="K" type="number" step="0.5" placeholder="auto"></label>
+      <label><b>Flux density, T</b><input name="B" type="number" step="0.01"></label>
+      <label><b>Core width W, mm</b><input name="W" type="number" placeholder="auto"></label>
+      <label><b>Core build D, mm</b><input name="D" type="number" placeholder="auto"></label>
+      <label><b>Inner turns / limb</b><input name="N1" type="number" placeholder="from V/t"></label>
+      <label><b>Outer turns / limb</b><input name="N2" type="number" placeholder="from V/t"></label>
+      <label><b>Inner layers</b><input name="lvLayers" type="number" placeholder="auto"></label>
+      <label><b>Outer layers</b><input name="hvLayers" type="number" placeholder="auto"></label>
+      <label><b>Inner J target, A/mm²</b><input name="J1" type="number" step="0.05" placeholder="auto"></label>
+      <label><b>Outer J target, A/mm²</b><input name="J2" type="number" step="0.05" placeholder="auto"></label>
+    </div>
+    <p class="subhead">Inner winding conductor (b axial × h radial)</p>
+    <div class="grid4">
+      <label><b>Type</b><select name="lvType"><option value="strip">Strip</option><option value="round">Round</option></select></label>
+      <label><b>b / Ø</b><input name="lvB" type="number" step="0.05" placeholder="auto"></label>
+      <label><b>h</b><input name="lvH" type="number" step="0.05" placeholder="auto"></label>
+      <label><b>Rad × Ax</b><span class="pair"><input name="lvRad" type="number" placeholder="–" aria-label="radial parallels"><input name="lvAx" type="number" placeholder="–" aria-label="axial parallels"></span></label>
+    </div>
+    <p class="subhead">Outer winding conductor</p>
+    <div class="grid4">
+      <label><b>Type</b><select name="hvType"><option value="strip">Strip</option><option value="round">Round</option></select></label>
+      <label><b>b / Ø</b><input name="hvB" type="number" step="0.05" placeholder="auto"></label>
+      <label><b>h</b><input name="hvH" type="number" step="0.05" placeholder="auto"></label>
+      <label><b>Rad × Ax</b><span class="pair"><input name="hvRad" type="number" placeholder="–" aria-label="radial parallels"><input name="hvAx" type="number" placeholder="–" aria-label="axial parallels"></span></label>
+    </div>
+    <p class="hint" id="rAutoNote"></p>
+    <button type="button" class="btn sm" id="rFix" hidden>Copy the automatic values into the fields</button>
+  </fieldset>
+  <details>
+    <summary>Clearances, insulation and factors</summary>
+    <div class="grid2">
+      <label><b>Bobbin gap (total), mm</b><input name="gap" type="number" step="0.5"></label>
+      <label><b>Inner–outer gap δ (total), mm</b><input name="delta" type="number" step="0.5"></label>
+      <label><b>Coil-to-coil am, mm</b><input name="am" type="number" step="0.5"></label>
+      <label><b>Limb plate on D, mm</b><input name="plateD" type="number" step="0.5"></label>
+      <label><b>Inner end clearance (total), mm</b><input name="lvEnd" type="number"></label>
+      <label><b>Outer min. end clearance, mm</b><input name="hvEndMin" type="number"></label>
+      <label><b>Inner radial ducts</b><input name="lvDucts" type="number" placeholder="auto"></label>
+      <label><b>Outer radial ducts</b><input name="hvDucts" type="number" placeholder="auto"></label>
+      <label><b>Duct width, mm</b><input name="ductW" type="number" step="0.5"></label>
+      <label><b>Conductor insulation, mm</b><input name="ins" type="number" step="0.01"></label>
+      <label><b>Inter-layer insulation, mm</b><input name="il" type="number" step="0.01"></label>
+      <label><b>Extra turn per layer (axial length)</b><input name="extraTurn" type="number" step="0.5" min="0"></label>
+      <label><b>Axial length value</b><select name="roundLen"><option value="0">Exact (e.g. 138.33)</option><option value="1">Round to whole mm (as CAL1)</option></select></label>
+      <label><b>Radial bulge factor</b><input name="bulge" type="number" step="0.01"></label>
+      <label><b>Stray/tank loss, W per kVA</b><input name="tankWkVA" type="number" step="0.1"></label>
+      <label><b>Core loss factor</b><input name="coreFactor" type="number" step="0.01"></label>
+      <label><b>Core building factor</b><input name="buildF" type="number" step="0.05"></label>
+      <label><b>Overall clearance L / B, mm</b><span class="pair"><input name="clrL" type="number" aria-label="length clearance"><input name="clrB" type="number" aria-label="breadth clearance"></span></label>
+    </div>
+  </details>
+  <details>
+    <summary>Material prices, ₹/kg</summary>
+    <div class="grid2">
+      <label><b>Core</b><input name="pCore" type="number"></label>
+      <label><b>Conductor</b><input name="pCond" type="number"></label>
+      <label><b>Core steel + SS</b><input name="pSteel" type="number"></label>
+      <label><b>FG insulation</b><input name="pFg" type="number"></label>
+      <label><b>Class H insulation</b><input name="pClh" type="number"></label>
+      <label><b>Resin</b><input name="pResin" type="number"></label>
+      <label><b>Others, %</b><input name="pOthers" type="number"></label>
+    </div>
+  </details>
+  <details open>
+    <summary>Sheet header</summary>
+    <div class="grid2">
+      <label class="full"><b>Party</b><input name="party"></label>
+      <label><b>Work order</b><input name="wo"></label>
+      <label><b>Calc. sheet no.</b><input name="sheetNo"></label>
+      <label><b>Designed by</b><input name="by"></label>
+      <label><b>Approved by</b><input name="appr"></label>
+    </div>
+  </details>
+</form>
+</aside>
+<main>
+  <div class="bar">
+    <div class="tabs" role="tablist" id="rTabs">
+      <button role="tab" aria-selected="true" data-rtab="sheet">Design sheet</button>
+      <button role="tab" aria-selected="false" data-rtab="comp">Compliance</button>
+      <button role="tab" aria-selected="false" data-rtab="steps">Step-by-step</button>
+    </div>
+    <div class="exports">
+      <button class="btn primary" id="rPdf">Download PDF</button>
+      <button class="btn" id="rXlsx">Download Excel</button>
+    </div>
+  </div>
+  <div class="kpis" id="rKpis"></div>
+  <div class="warns" id="rWarns"><strong>Does not meet the requirement yet</strong><ul></ul></div>
+  <p class="okline" id="rOk">Meets every checked requirement: impedance, efficiency, temperature rise, ratio error, flux and current density.</p>
+  <section id="rtab-sheet">
+    <div class="drawing"><h2>Core and coil assembly, to scale</h2><div id="rSvg"></div></div>
+    <div class="sheet" id="rSheet"></div>
+  </section>
+  <section id="rtab-comp" hidden><div class="sheet" id="rComp"></div></section>
+  <section id="rtab-steps" hidden><div class="sheet steps" id="rSteps"></div></section>
+</main>
+</div>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+// ===== Dry-type transformer design engine (step method, Sara Consultants style) =====
+const MAT = {
+  Cu:{name:'Copper',rho20:0.017241,k:234.5,dens:8.89,strayCoefStrip:0.9622,strayCoefRound:0.80},
+  Al:{name:'Aluminium',rho20:0.02826,k:225,dens:2.703,strayCoefStrip:0.76,strayCoefRound:0.63}
+};
+const CORE_GRADES = { // Table 7 specific loss W/kg @50Hz
+  'M4-0.27':{t:0.27,pts:[[1.40,0.70],[1.50,0.83],[1.60,1.01],[1.70,1.25],[1.73,1.33]]},
+  'M3-0.23':{t:0.23,pts:[[1.40,0.57],[1.50,0.67],[1.60,0.80],[1.70,1.01],[1.73,1.04]]},
+  '23ZDMH-0.23':{t:0.23,pts:[[1.40,0.49],[1.50,0.56],[1.60,0.65],[1.70,0.77],[1.73,0.80]]}
+};
+const CLASS_RISE = {A:60,E:75,B:80,F:100,H:125};
+function interp(pts,x){ let i=0; if(x<=pts[0][0]) i=0; else if(x>=pts[pts.length-1][0]) i=pts.length-2; else {while(!(x>=pts[i][0]&&x<=pts[i+1][0]))i++;}
+  const [x0,y0]=pts[i],[x1,y1]=pts[i+1]; return y0+(y1-y0)*(x-x0)/(x1-x0);}
+function buildFactor(D,joint){ if(joint==='step'){return D<=300?1.20:1.10;} return D<=150?1.30:D<=300?1.25:1.20; }
+function cornerRed(h){ if(h<=1.60)return 0.215; if(h<=2.24)return 0.363; if(h<=3.55)return 0.550; if(h<=5.60)return 0.860; return 1.340; }
+function ductByLen(L){ return L<400?10:L<500?12:L<600?16:20; }
+const r1=(x,n=1)=>Math.round(x*10**n)/10**n;
+function hvClass(kVline){ if(kVline<=1.1) return {um:1.1,hvEnd:40,gap:10,phase:15,pf:3,li:0};
+  if(kVline<=3.6) return {um:3.6,hvEnd:60,gap:15,phase:20,pf:10,li:40};
+  if(kVline<=7.2) return {um:7.2,hvEnd:100,gap:22,phase:25,pf:20,li:60};
+  if(kVline<=12) return {um:12,hvEnd:140,gap:31,phase:31,pf:28,li:75};
+  if(kVline<=24) return {um:24,hvEnd:200,gap:45,phase:45,pf:50,li:125};
+  return {um:36,hvEnd:260,gap:55,phase:60,pf:70,li:170}; }
+
+// Stepped core: optimise step widths on a 5 mm grid, return steps & net area
+const _sc={};
+function stepCore(D,n,sf){ const key=D+'|'+n+'|'+sf; if(_sc[key]) return _sc[key]; return (_sc[key]=stepCore0(D,n,sf)); }
+function stepCore0(D,n,sf){
+  const R=D/2; let w=[]; for(let k=1;k<=n;k++){ const th=(k-0.5)/n*Math.PI/2*0.98; w.push(Math.max(20,Math.floor(2*R*Math.cos(th)/5)*5)); }
+  w=[...new Set(w)].sort((a,b)=>b-a);
+  const area=(ws)=>{ let prev=0,A=0; for(const x of ws){ if(x>D) return -1; const y=Math.sqrt(R*R-(x/2)**2); A+=x*2*(y-prev); prev=y;} return A; };
+  let best=area(w), improved=true, it=0;
+  while(improved&&it<200){ improved=false; it++;
+    for(let i=0;i<w.length;i++) for(const d of [-5,5]){ const t=w.slice(); t[i]+=d;
+      if(t[i]<20||t[i]>D-1) continue; if(i>0&&t[i]>=t[i-1]) continue; if(i<t.length-1&&t[i]<=t[i+1]) continue;
+      const a=area(t); if(a>best+1e-9){best=a;w=t;improved=true;} } }
+  let prev=0; const steps=w.map(x=>{ const y=Math.sqrt(R*R-(x/2)**2); const s=2*(y-prev); prev=y; return {w:x,stack:s,net:x*s*sf}; });
+  return {steps,gross:best,net:best*sf,util:best/(Math.PI*R*R)};
+}
+
+function design(p){
+  const out={inp:p,steps:[],warn:[]}; const S=(n,title,formula,result,note)=>out.steps.push({n,title,formula,result,note});
+  const kVA=p.kVA,f=p.freq; const sq3=Math.sqrt(3);
+  const lvDelta=p.lvConn==='D', hvDelta=p.hvConn==='D';
+  const Vlv=lvDelta?p.lvV:p.lvV/sq3, Vhv=hvDelta?p.hvV:p.hvV/sq3;
+  const cls=hvClass(p.hvV/1000);
+  const mLV=MAT[p.lvMat], mHV=MAT[p.hvMat];
+  const T=p.refTemp; const rho=(m)=>m.rho20*(m.k+T)/(m.k+20);
+  // Step 1-3
+  const vtEst=p.k*Math.sqrt(kVA);
+  S(1,'Volts / turn (estimate)','V/T = k × √kVA = '+p.k+' × √'+kVA, r1(vtEst,3)+' V');
+  const Nlv=p.lvTurns||Math.max(1,Math.round(Vlv/vtEst));
+  S(2,'LV turns / phase','N = V_LV,ph ÷ V/T = '+r1(Vlv,2)+' ÷ '+r1(vtEst,3), Nlv+' turns', p.lvTurns?'Fixed by user':'Rounded to integer');
+  const vt=Vlv/Nlv;
+  S(3,'Revised volts / turn','V/T = '+r1(Vlv,2)+' ÷ '+Nlv, r1(vt,4)+' V');
+  // Step 4-6 core
+  const Areq=vt/(4.44*f*p.B*1e-6);
+  S(4,'Net core area required','A = V/T ÷ (4.44 × f × B × 10⁻⁶) = '+r1(vt,4)+' ÷ (4.44 × '+f+' × '+p.B+' × 10⁻⁶)', Math.round(Areq)+' mm²');
+  let D=p.coreDia||Math.floor(Math.sqrt(4*Areq/(Math.PI*0.92))*0.97), core;
+  const nSteps=(d)=>p.coreSteps||(d<120?6:d<180?8:d<250?10:d<350?12:14);
+  if(p.coreDia){ core=stepCore(D,nSteps(D),p.sf); }
+  else { for(let g=0;g<400;g++){ core=stepCore(D,nSteps(D),p.sf); if(core.net>=Areq) break; D++; } }
+  const Anet=core.net, Bact=vt/(4.44*f*Anet*1e-6);
+  S(5,'Gross core area / core factor','Gross = Net ÷ core factor = '+Math.round(Areq)+' ÷ '+r1(core.net/(Math.PI*D*D/4),3), Math.round(Areq/(core.net/(Math.PI*D*D/4)))+' mm²','Core factor = stacking × step utilisation');
+  S(6,'Core diameter','D = √(Gross ÷ π/4), then stepped with '+core.steps.length+' steps', D+' mm','Net area obtained '+Math.round(Anet)+' mm² → B = '+r1(Bact,3)+' T');
+  out.core={D,steps:core.steps,Anet,gross:core.gross,util:core.util,B:Bact};
+  if(Bact>1.70) out.warn.push('Flux density '+r1(Bact,3)+' T is above 1.70 T — expect high no-load loss and noise.');
+  // ---- window
+  const Hw=p.window||Math.round(D*(p.lvMat==='Al'?4.6:3.2)/5)*5;
+  out.window=Hw;
+  const hvEnd=p.hvEnd||cls.hvEnd, lvEnd=p.lvEnd||Math.max(30,hvEnd-30);
+  // ====== LV ======
+  const Ilv=kVA*1000/(3*Vlv);
+  S(7,'LV voltage / phase',(lvDelta?'Delta: V_ph = V_L':'Star: V_ph = V_L ÷ √3')+' = '+p.lvV+(lvDelta?'':' ÷ √3'), r1(Vlv,2)+' V');
+  S(8,'LV current / phase','I = kVA ÷ (3 × V_ph) = '+kVA+'000 ÷ (3 × '+r1(Vlv,2)+')', r1(Ilv,2)+' A');
+  const lvLayers=p.lvLayers||2; const tpl=Nlv/lvLayers;
+  S(9,'LV turns / phase','From step 2',Nlv+' turns');
+  S(10,'LV number of layers','Chosen (even layers preferred)',lvLayers+' layers');
+  S(11,'LV turns / layer',Nlv+' ÷ '+lvLayers, r1(tpl,2));
+  const insLV=p.lvIns; const Areqlv=Ilv/p.Jlv;
+  const transp=p.lvTransp!=null?p.lvTransp:30;
+  let best=null;
+  const tryCfg=(a,r)=>{ const Lw=Hw-2*lvEnd-(r>1?transp:0); const bi=Lw/((tpl+1)*a); const b=Math.floor((bi-insLV)*10)/10;
+    const per=Areqlv/(a*r); let h=Math.round(((per+cornerRed(per/b))/b)*10)/10; if(h<0.8) h=0.8;
+    return {a,r,Lw,bi:b+insLV,b,h,hi:h+insLV,per}; };
+  if(p.lvAx&&p.lvRad){ best=tryCfg(p.lvAx,p.lvRad); }
+  else { const hmax=p.lvMat==='Al'?6.0:5.0; const cands=[];
+    for(let r=1;r<=6;r++) for(let a=1;a<=24;a++){ const c=tryCfg(a,r); if(c.b<4||c.b>16||c.h<1.2||c.h>hmax) continue; cands.push(c);} 
+    cands.sort((x,y)=>(x.a*x.r-y.a*y.r)||(x.h-y.h)); best=cands[0]; if(!best){ best=tryCfg(4,2); out.noStrip=true; } }
+  const L=best; const crl=cornerRed(L.h); const lvCs=(L.b*L.h-crl)*L.a*L.r; const Jlv=Ilv/lvCs;
+  S(12,'LV parallel conductors','Area = I ÷ J = '+r1(Ilv,2)+' ÷ '+p.Jlv+' = '+r1(Areqlv,1)+' mm²; '+L.a+' axial × '+L.r+' radial', r1(Areqlv/(L.a*L.r),2)+' mm² / conductor');
+  S(13,'LV conductor breadth','Winding length = '+Hw+' − 2×'+lvEnd+(L.r>1?' − '+transp+' transposition':'')+' = '+Math.round(L.Lw)+'; bi = '+Math.round(L.Lw)+' ÷ {('+r1(tpl,2)+' + 1) × '+L.a+'}', 'b = '+L.b+' mm, bi = '+r1(L.bi,2)+' mm');
+  S(14,'LV conductor height','h = (area + corner) ÷ b', 'h = '+L.h+' mm, hi = '+r1(L.hi,2)+' mm');
+  S(15,'LV total cross section','{(b × h) − corner} × parallels = {('+L.b+' × '+L.h+') − '+crl+'} × '+(L.a*L.r), r1(lvCs,2)+' mm²');
+  S(16,'LV current density',r1(Ilv,2)+' ÷ '+r1(lvCs,2), r1(Jlv,3)+' A/mm²');
+  const lvVlayer=vt*2*2*tpl; const lvIL=Math.max(p.lvMinIns,lvVlayer/p.Eb-insLV);
+  const lvDucts=p.lvDucts!=null?p.lvDucts:Math.floor(lvLayers/2); const lvDuctT=p.lvDuctT||ductByLen(L.Lw);
+  S(17,'LV inter-layer insulation','V/T × 2 × 2 × turns/layer ÷ '+p.Eb+' − '+insLV+' = '+r1(lvVlayer/p.Eb-insLV,3), r1(lvIL,2)+' mm', lvDucts+' axial air duct(s) of '+lvDuctT+' mm');
+  const lvRad=L.hi*L.r*lvLayers+lvDucts*lvDuctT+lvIL*Math.max(0,lvLayers-1-lvDucts)+p.lvTol*lvLayers;
+  const lvRadR=Math.ceil(lvRad*2)/2;
+  S(18,'LV radial thickness','hi × radial × layers + ducts + insulation + tolerance = '+r1(L.hi,2)+'×'+L.r+'×'+lvLayers+' + '+lvDucts+'×'+lvDuctT+' + '+r1(lvIL*Math.max(0,lvLayers-1-lvDucts),2)+' + '+p.lvTol+'×'+lvLayers, lvRadR+' mm');
+  const lvID=D+2*p.coreLV, lvOD=lvID+2*lvRadR, lvLMT=Math.PI*(lvID+lvOD)/2/1000;
+  S(19,'LV mean turn','ID = '+D+' + 2×'+p.coreLV+' = '+lvID+'; OD = '+lvID+' + 2×'+lvRadR+' = '+lvOD, r1(lvLMT,4)+' m');
+  const lvLen=lvLMT*Nlv; const lvWire=lvLMT*L.a*L.r*Nlv*3*(1+L.a*L.r/100);
+  S(20,'LV wire length','LMT × parallels × turns × 3 limbs × (1 + parallels/100)', Math.round(lvWire)+' m');
+  const Rlv=rho(mLV)*lvLen/lvCs; const Rlv20=Rlv*(mLV.k+20)/(mLV.k+T);
+  S(21,'LV resistance / phase','R = ρ'+T+' × LMT × N ÷ A = '+r1(rho(mLV),5)+' × '+r1(lvLMT,4)+' × '+Nlv+' ÷ '+r1(lvCs,2), (Rlv*1000).toFixed(4)+' mΩ @'+T+'°C; '+(Rlv20*1000).toFixed(4)+' mΩ @20°C');
+  const lvBare=lvLMT*Nlv*lvCs*3*mLV.dens*1e-3; const lvIns=lvBare*(1+((L.bi*L.hi-L.b*L.h)/(L.b*L.h))*1.85/mLV.dens); const lvProc=lvIns*(1+L.a*L.r/100);
+  S(22,'LV conductor weight','Bare = LMT × N × A × 3 × ρ; insulated & procurement', r1(lvBare,1)+' / '+r1(lvIns,1)+' / '+r1(lvProc,1)+' kg','Bare / insulated / procurement');
+  const coefLV=Math.sqrt(Math.PI*f*4*Math.PI*1e-7/(rho(mLV)*1e-6))/1000; // per mm
+  const fillLV=Math.min(1,(L.b*L.a*Math.ceil(tpl))/L.Lw); const mR=L.r*lvLayers;
+  const lvStray=100*((mR*mR-0.2)/9)*Math.pow(Math.sqrt(fillLV)*coefLV*L.h,4);
+  S(23,'LV stray (eddy) loss','[√fill × '+r1(coefLV*10,4)+' × h/10]⁴ × (m² − 0.2)/9; m = '+mR+', fill = '+r1(fillLV,3), r1(lvStray,3)+' %');
+  const lvI2R=3*Ilv*Ilv*Rlv; const lvLL=lvI2R*(1+lvStray/100);
+  S(24,'LV load loss','3 × I² × R × (1 + stray) = 3 × '+r1(Ilv,2)+'² × '+(Rlv*1000).toFixed(4)+'e-3 × '+r1(1+lvStray/100,4), Math.round(lvLL)+' W');
+  const lvSurf=0.75*2*(lvDucts+1); const lvGrad=lvLL/(3*lvSurf*p.hdInner*(L.Lw/1000*lvLMT));
+  S(25,'LV winding gradient','Loss ÷ {3 × '+lvSurf+' surfaces × '+p.hdInner+' × ('+r1(L.Lw/1000,3)+' × '+r1(lvLMT,4)+')}', r1(lvGrad,1)+' °C');
+  const lvWound=(tpl+1)*L.a*L.bi+(L.r>1?transp:0);
+  out.lv={V:Vlv,I:Ilv,N:Nlv,layers:lvLayers,tpl,a:L.a,r:L.r,b:L.b,h:L.h,bi:L.bi,hi:L.hi,cs:lvCs,J:Jlv,ins:insLV,IL:lvIL,ducts:lvDucts,ductT:lvDuctT,
+    rad:lvRadR,ID:lvID,OD:lvOD,LMT:lvLMT,wire:lvWire,R:Rlv,R20:Rlv20,bare:lvBare,insW:lvIns,proc:lvProc,stray:lvStray,LL:lvLL,grad:lvGrad,Lw:L.Lw,wound:lvWound,end:lvEnd,transp:L.r>1?transp:0,surf:lvSurf,mat:mLV};
+  // ====== HV ======
+  const Ihv=kVA*1000/(3*Vhv);
+  S(26,'HV voltage / phase',(hvDelta?'Delta: V_ph = V_L':'Star: V_ph = V_L ÷ √3'), r1(Vhv,1)+' V');
+  S(27,'HV current / phase',kVA+'000 ÷ (3 × '+r1(Vhv,1)+')', r1(Ihv,3)+' A');
+  const Vmax=Vhv*(1+p.tapPlus/100), Vmin=Vhv*(1-p.tapMinus/100);
+  const Nn=Math.round(Vhv/vt), Nmax=Math.round(Vmax/vt), Nmin=Math.round(Vmin/vt);
+  const nTaps=p.tapStep>0?Math.round((p.tapPlus+p.tapMinus)/p.tapStep)+1:1;
+  const tapTurns=[]; if(p.tapStep>0){ for(let x=p.tapPlus;x>=-p.tapMinus-1e-9;x-=p.tapStep) tapTurns.push({pct:r1(x,2),N:Math.round(Vhv*(1+x/100)/vt)}); } else tapTurns.push({pct:0,N:Nn});
+  const coils=p.hvCoils||(cls.um<=3.6?1:cls.um<=12?6:cls.um<=24?8:10);
+  const tpc=Math.ceil(Nmax/coils); const coilGap=p.hvCoilGap;
+  const hvLw=Hw-2*hvEnd; const coilLen=(hvLw-(coils-1)*coilGap)/coils;
+  const Ahv=Ihv/p.Jhv; let cond=p.hvCond; if(cond==='auto') cond=Ahv<=10?'round':'strip';
+  let H={};
+  if(cond==='round'){ let d=Math.ceil(Math.sqrt(4*Ahv/Math.PI)*10)/10; const ins=p.hvInsRound; H={type:'round',d,di:d+ins,ax:d+ins,radb:d,radi:d+ins,cs:Math.PI*d*d/4,ins,np:1,desc:'Ø '+d.toFixed(2)+' mm bare / Ø '+(d+ins).toFixed(2)+' ins.'}; }
+  else { const np=Ahv>70?2:1; const A1=Ahv/np; let w=Math.min(12.5,Math.max(4,Math.round(Math.sqrt(6*A1)))); let t=Math.ceil(((A1+cornerRed(A1/w))/w)*20)/20; if(t>5){t=5;}
+    const ins=p.hvInsStrip; const cs=(w*t-cornerRed(t))*np; H={type:'strip',w,t,ax:(w+ins)*np,radb:t,radi:t+ins,cs,ins,np,desc:w+' × '+t.toFixed(2)+' mm'+(np>1?' ('+np+' axial)':'')}; }
+  const hvTpl=Math.max(1,Math.floor(coilLen/H.ax)-1); const hvLayers=Math.ceil(tpc/hvTpl);
+  S(28,'HV turns / phase','N = V_ph × (1 + tap) ÷ V/T', Nmax+' (max) / '+Nn+' (normal) / '+Nmin+' (min)', coils+(coils>1?' coils × ':' coil × ')+tpc+' turns; coil length = ('+hvLw+' − '+(coils-1)+'×'+coilGap+') ÷ '+coils+' = '+r1(coilLen,1)+' mm; '+hvTpl+' turns/layer, '+hvLayers+' layers');
+  S(29,'HV conductor area','I ÷ J = '+r1(Ihv,3)+' ÷ '+p.Jhv, r1(Ahv,3)+' mm²');
+  S(30,'HV conductor size',cond==='round'?'d = √(A ÷ π/4)':'strip, width ≈ √(6A)', H.desc);
+  const Jn=Ihv/H.cs, Imin=kVA*1000/(3*Vmin), Jmin=Imin/H.cs;
+  S(31,'HV current density','I ÷ A = '+r1(Ihv,3)+' ÷ '+r1(H.cs,3), r1(Jn,3)+' (normal) / '+r1(Jmin,3)+' A/mm² (lowest tap)');
+  const hvVlayer=vt*2*2*hvTpl; const hvIL=Math.max(p.hvMinIns,Math.ceil((hvVlayer/p.Eb-H.ins)*100)/100);
+  S(32,'HV inter-layer insulation','V/T × 2 × 2 × '+hvTpl+' ÷ '+p.Eb+' − '+H.ins+' = '+r1(hvVlayer/p.Eb-H.ins,3), r1(hvIL,2)+' mm');
+  const hvDucts=p.hvDucts!=null?p.hvDucts:Math.floor(hvLayers/4); const hvDuctT=p.hvDuctT;
+  const hvRad=Math.ceil((H.radi*hvLayers+hvIL*(hvLayers-1-hvDucts>0?hvLayers-1-hvDucts:0)+hvDucts*hvDuctT+p.hvTol*hvLayers)*2)/2;
+  S(33,'HV radial thickness','hi × layers + insulation + ducts + tolerance = '+r1(H.radi,2)+'×'+hvLayers+' + '+r1(hvIL,2)+'×'+Math.max(0,hvLayers-1-hvDucts)+' + '+hvDucts+'×'+hvDuctT+' + '+p.hvTol+'×'+hvLayers, hvRad+' mm');
+  const gap=p.lvhvGap||cls.gap; const hvID=lvOD+2*gap, hvOD=hvID+2*hvRad; const hvLMT=Math.PI*(hvID+hvOD)/2/1000;
+  const phase=p.phaseGap||cls.phase; const CD=Math.ceil((hvOD+phase)/5)*5;
+  S(34,'HV mean turn','ID = '+lvOD+' + 2×'+gap+' = '+hvID+'; OD = '+hvID+' + 2×'+hvRad+' = '+hvOD, r1(hvLMT,4)+' m','Leg centres = '+hvOD+' + '+phase+' → '+CD+' mm');
+  const hvWire=hvLMT*H.np*Nmax*3*(1+H.np/100);
+  S(35,'HV wire length','LMT × parallels × N_max × 3 × tolerance', Math.round(hvWire)+' m');
+  const Rhv=rho(mHV)*hvLMT*Nn/H.cs, Rhv20=Rhv*(mHV.k+20)/(mHV.k+T); const RhvMin=rho(mHV)*hvLMT*Nmin/H.cs;
+  S(36,'HV resistance / phase','ρ × LMT × N_normal ÷ A = '+r1(rho(mHV),5)+' × '+r1(hvLMT,4)+' × '+Nn+' ÷ '+r1(H.cs,3), r1(Rhv,4)+' Ω @'+T+'°C; '+r1(Rhv20,4)+' Ω @20°C');
+  const hvBare=hvLMT*Nmax*H.cs*3*mHV.dens*1e-3;
+  const insRatio=H.type==='round'?((H.di**2-H.d**2)/(H.d**2)):(((H.w+H.ins)*(H.t+H.ins)-H.w*H.t)/(H.w*H.t));
+  const hvInsW=hvBare*(1+insRatio*1.85/mHV.dens); const hvProc=hvInsW*(1+H.np/100);
+  S(37,'HV conductor weight','Bare / insulated / procurement', r1(hvBare,1)+' / '+r1(hvInsW,1)+' / '+r1(hvProc,1)+' kg');
+  const coefHV=Math.sqrt(Math.PI*f*4*Math.PI*1e-7/(rho(mHV)*1e-6))/1000*(H.type==='round'?0.83:1);
+  const hvAxBare=H.type==='round'?H.d:H.w*H.np; const fillHV=Math.min(1,hvAxBare*hvTpl*coils/hvLw);
+  const hvStray=100*((hvLayers*hvLayers-0.2)/9)*Math.pow(Math.sqrt(fillHV)*coefHV*H.radb,4);
+  S(38,'HV stray (eddy) loss','[√fill × '+r1(coefHV*10,4)+' × h/10]⁴ × (m² − 0.2)/9; m = '+hvLayers+', fill = '+r1(fillHV,3), r1(hvStray,3)+' %');
+  const hvLL=3*Ihv*Ihv*Rhv*(1+hvStray/100), hvLLmin=3*Imin*Imin*RhvMin*(1+hvStray/100);
+  S(39,'HV load loss','3 × I² × R × (1 + stray)', Math.round(hvLL)+' W (normal) / '+Math.round(hvLLmin)+' W (lowest tap)');
+  const hvSurf=p.hvSurf||(1.0+0.75+1.5*hvDucts+(coils>1?1.5:0)); const hvGrad=hvLLmin/(3*hvSurf*p.hdOuter*(hvLw/1000*hvLMT));
+  S(40,'HV winding gradient','Loss ÷ {3 × '+hvSurf+' surfaces × '+p.hdOuter+' × ('+r1(hvLw/1000,3)+' × '+r1(hvLMT,4)+')}', r1(hvGrad,1)+' °C');
+  const hvWound=coils*(hvTpl+1)*H.ax+(coils-1)*coilGap;
+  out.hv={V:Vhv,I:Ihv,Imin,Nn,Nmax,Nmin,taps:tapTurns,nTaps,coils,tpc,coilLen,tpl:hvTpl,layers:hvLayers,cond:H,J:Jn,Jmin,IL:hvIL,ducts:hvDucts,ductT:hvDuctT,rad:hvRad,ID:hvID,OD:hvOD,
+    LMT:hvLMT,wire:hvWire,R:Rhv,R20:Rhv20,bare:hvBare,insW:hvInsW,proc:hvProc,stray:hvStray,LL:hvLL,LLmin:hvLLmin,grad:hvGrad,Lw:hvLw,wound:hvWound,end:hvEnd,gap,phase,CD,coilGap,surf:hvSurf,mat:mHV};
+  // ====== Core weight & loss ======
+  const coreLen=2*D+3*Hw+4*CD; const coreW=coreLen*Anet*7.65e-6;
+  S(41,'Core weight','Length = 2D + 3L + 4A = 2×'+D+' + 3×'+Hw+' + 4×'+CD+' = '+coreLen+' mm; W = L × A_net × 7.65', Math.round(coreW)+' kg');
+  const sl=interp(CORE_GRADES[p.grade].pts,Bact); const bf=buildFactor(D,p.joint); const NLL=coreW*sl*bf;
+  S(42,'No-load (core) loss','W × specific loss × build factor = '+Math.round(coreW)+' × '+r1(sl,3)+' × '+bf, Math.round(NLL)+' W',p.grade+' @ '+r1(Bact,3)+' T');
+  // ====== Impedance ======
+  const AT=Ilv*Nlv; const hMean=(lvWound+hvWound)/2; const g=gap, b1=lvRadR, b2=hvRad; const delta=g+b1+b2;
+  const x=Math.PI*hMean/delta; const kr=1-(1-Math.exp(-x))/x; const Ls=hMean/kr;
+  const Dg=lvOD+g, D1=(lvID+lvOD)/2, D2=(hvID+hvOD)/2; const sumATD=(Dg*g+(D1*b1+D2*b2)/3)/100; // cm²
+  const ex=1.24e-3*(f/50)*AT*sumATD/(vt*Ls/10);
+  const LLtot=lvLL+hvLL, LLmin=lvLL*1+hvLLmin; const er=LLtot/(kVA*10); const ek=Math.sqrt(ex*ex+er*er);
+  S(43,'Impedance','ex = 1.24×10⁻³ × (f/50) × AT × ΣD·a ÷ (V/T × Ls); AT = '+Math.round(AT)+', Ls = '+r1(hMean/10,2)+' ÷ '+r1(kr,3)+' = '+r1(Ls/10,2)+' cm, ΣD·a = '+r1(sumATD,2)+' cm²', 'ex = '+r1(ex,3)+' %, er = '+r1(er,3)+' %, ez = '+r1(ek,3)+' %');
+  if(p.zTarget){ const dz=(ek-p.zTarget)/p.zTarget*100; if(Math.abs(dz)>10) out.warn.push('Impedance '+r1(ek,2)+' % is '+r1(dz,1)+' % from the '+p.zTarget+' % target (IS 2026 tolerance ±10 %). Adjust window height, k or LV–HV gap.'); }
+  // ====== Enclosure & weights ======
+  const yoke=Math.round(D/5)*5; const activeL=2*CD+hvOD, activeB=hvOD, activeH=2*yoke+Hw;
+  const eL=Math.ceil((activeL+2*p.enclClr)/10)*10, eB=Math.ceil((activeB+2*p.enclClr)/10)*10, eH=Math.ceil((p.bottomClr+activeH+p.enclClr)/10)*10;
+  S(44,'Enclosure size','L = '+p.enclClr+' + 2×'+CD+' + '+hvOD+' + '+p.enclClr+'; B = '+p.enclClr+' + '+hvOD+' + '+p.enclClr+'; H = '+p.bottomClr+' + '+yoke+' + '+Hw+' + '+yoke+' + '+p.enclClr, eL+' × '+eB+' × '+eH+' mm');
+  const clamps=coreW*0.10, insMisc=(lvBare+hvBare)*0.08+coreW*0.02; const active=coreW+lvIns+hvInsW+clamps+insMisc; const encl=p.enclosure?active*0.22:0; const total=active+encl;
+  S(45,'Weights','Active part = core + conductors + clamps + insulation; enclosure ≈ 22 % of active part', Math.round(active)+' kg active, '+Math.round(total)+' kg total');
+  out.imp={AT,hMean,kr,Ls,sumATD,ex,er,ek,delta};
+  out.core.len=coreLen; out.core.W=coreW; out.core.sl=sl; out.core.bf=bf; out.core.NLL=NLL; out.core.CD=CD; out.core.yoke=yoke;
+  out.loss={NLL,LL:LLtot,LLmin,total:NLL+LLtot,eff100:100*kVA*1000/(kVA*1000+NLL+LLtot),eff50:100*kVA*500/(kVA*500+NLL+0.25*LLtot)};
+  out.dims={activeL,activeB,activeH,eL,eB,eH};
+  out.wts={core:coreW,lv:lvIns,hv:hvInsW,clamps,insMisc,active,encl,total};
+  out.cls=cls; out.rise=CLASS_RISE[p.insClass];
+  if(lvGrad>out.rise) out.warn.push('LV gradient '+r1(lvGrad,1)+' °C exceeds the class '+p.insClass+' limit of '+out.rise+' K. Add an LV duct or lower LV current density.');
+  if(hvGrad>out.rise) out.warn.push('HV gradient '+r1(hvGrad,1)+' °C exceeds the class '+p.insClass+' limit of '+out.rise+' K.');
+  const jmax=(m)=>m==='Cu'?3.0:1.8;
+  if(Jlv>jmax(p.lvMat)) out.warn.push('LV current density '+r1(Jlv,2)+' A/mm² is high for '+mLV.name+'.');
+  if(Jmin>jmax(p.hvMat)) out.warn.push('HV current density at lowest tap '+r1(Jmin,2)+' A/mm² is high for '+mHV.name+'.');
+  if(L.b<4||L.b>16) out.warn.push('LV strip breadth '+L.b+' mm is outside the normal 4–16 mm range. Change layers or parallels.');
+  if(hvWound>hvLw+1) out.warn.push('HV coils need '+Math.round(hvWound)+' mm but only '+hvLw+' mm is available.');
+  return out;
+}
+
+function designAuto(p){
+  const base=design({...p,window:p.window||null});
+  const D=base.core.D, rise=base.rise;
+  const wins=p.window?[p.window]:(()=>{const a=[];for(let w=Math.round(D*2.2/5)*5;w<=Math.round(D*6.5/5)*5;w+=10)a.push(w);return a;})();
+  const layerOpts=p.lvLayers?[p.lvLayers]:[2,4,3,6];
+  const target=p.zTarget||null;
+  let best=null,bestScore=Infinity;
+  for(const w of wins) for(const L of layerOpts){
+    let q={...p,window:w,lvLayers:L}; let o=null;
+    const lvD=p.lvDucts!=null?[p.lvDucts]:Array.from({length:L},(_,i)=>i);
+    for(const d of lvD){ o=design({...q,lvDucts:d}); if(o.lv.grad<=rise-5) { q.lvDucts=d; break; } q.lvDucts=d; }
+    const hvD=p.hvDucts!=null?[p.hvDucts]:[0,1,2,3,4];
+    for(const d of hvD){ o=design({...q,hvDucts:d}); if(o.hv.grad<=rise-5||d===hvD[hvD.length-1]) { q.hvDucts=d; break; } }
+    let sc=0;
+    if(o.noStrip) sc+=100;
+    if(o.lv.b<4||o.lv.b>16) sc+=50;
+    if(o.hv.wound>o.hv.Lw+1) sc+=50;
+    if(o.lv.grad>rise) sc+=20+(o.lv.grad-rise); if(o.hv.grad>rise) sc+=20+(o.hv.grad-rise);
+    sc+= target? 10*Math.abs(o.imp.ek-target)/target : 0;
+    sc+= (q.lvDucts+q.hvDucts)*0.15 + (L-2)*0.1 + w/D*0.02 + o.loss.total/(p.kVA*1000)*5;
+    if(sc<bestScore){bestScore=sc;best=o;}
+  }
+  best.auto={window:!p.window,layers:!p.lvLayers,lvDucts:p.lvDucts==null,hvDucts:p.hvDucts==null};
+  return best;
+}
+const DEFAULTS={kVA:500,hvV:11000,lvV:415,hvConn:'D',lvConn:'Y',freq:50,lvMat:'Cu',hvMat:'Cu',insClass:'F',k:0.56,B:1.64,Jlv:2.0,Jhv:2.4,
+  tapPlus:2.5,tapMinus:7.5,tapStep:2.5,grade:'M4-0.27',joint:'mitred',refTemp:75,zTarget:5,sf:0.97,
+  window:650,lvEnd:110,hvEnd:140,lvLayers:2,lvAx:4,lvRad:2,lvTransp:30,lvIns:0.3,lvMinIns:0.1,lvTol:0.3,lvDucts:1,lvDuctT:10,coreLV:10,
+  hvCoils:6,hvCoilGap:12,hvCond:'round',hvInsRound:0.2,hvInsStrip:0.44,hvMinIns:0.05,hvTol:0,hvDucts:0,hvDuctT:12,lvhvGap:31,phaseGap:31,
+  Eb:10000,hdInner:6,hdOuter:8,enclClr:200,bottomClr:100,enclosure:true};
+
+
+// ===== Rectangular-core dry-type (LV/LV) design engine — follows the RECT CORE TYPE CAL1 sheet =====
+const RC={};
+RC.CORELOSS={B:[0.6,0.625,0.65,0.675,0.7,0.725,0.75,0.775,0.8,0.825,0.85,0.875,0.9,0.925,0.95,0.975,1,1.025,1.05,1.075,1.1,1.125,1.15,1.175,1.2,1.225,1.25,1.275,1.3,1.325,1.35,1.375,1.4,1.425,1.45,1.475,1.5,1.525,1.55,1.575,1.6,1.625,1.65,1.675,1.7,1.725,1.75],
+ 'CRNO-35':[0.45,0.475,0.5,0.525,0.55,0.575,0.6,0.625,0.65,0.675,0.725,0.765,0.8,0.825,0.85,0.9,0.95,1,1.05,1.1,1.15,1.2,1.25,1.3,1.35,1.425,1.5,1.55,1.6,1.675,1.75,1.825,1.9,1.975,2.05,2.15,2.25,2.35,2.45],
+ 'M4-27':[0.135,0.15,0.16,0.17,0.18,0.19,0.2,0.218,0.235,0.258,0.26,0.275,0.29,0.31,0.33,0.345,0.36,0.38,0.4,0.42,0.44,0.46,0.48,0.495,0.51,0.535,0.56,0.58,0.6,0.625,0.65,0.675,0.7,0.73,0.76,0.795,0.83,0.865,0.9,0.95,1,1.06,1.12,1.185,1.25,1.325,1.4],
+ 'MOH-23':[0.11,0.12,0.13,0.14,0.15,0.16,0.17,0.185,0.195,0.21,0.22,0.23,0.24,0.255,0.27,0.285,0.3,0.31,0.32,0.335,0.35,0.37,0.39,0.405,0.42,0.44,0.46,0.475,0.49,0.505,0.52,0.54,0.56,0.58,0.6,0.625,0.65,0.675,0.7,0.73,0.76,0.79,0.82,0.86,0.9,0.95,1]};
+RC.VAKG={B:[1.25,1.3,1.35,1.4,1.45,1.5,1.55,1.6,1.65,1.7,1.75],v:[0.65,0.7,0.76,0.82,0.9,1.03,1.2,1.45,1.85,2.5,4]};
+RC.COND={Cu:{t90:44.7,t115:42.76,dens:8.89,sf:0.9622,name:'COPPER'},Al:{t90:28,t115:26.73,dens:2.7,sf:0.7618,name:'ALUMINIUM'}};
+RC.PRICE={core:270,coreSteel:200,cond:{Al:440,Cu:900},leads:{Al:440,Cu:900},fg:500,connFg:500,clh:5950,resin:650,crca:90,others:15};
+RC.LAM=[30,35,40,45,50,55,60,65,70,75,80,85,90,95,100,110,120,130,140,150,160,170,180,200,220,250];
+function rcLookup(xs,ys,x,mode){ const n=Math.min(xs.length,ys.length); if(mode==='floor'){ let i=0; for(let k=0;k<n;k++) if(xs[k]<=x+1e-9) i=k; return ys[i]; }
+  if(x<=xs[0]) return ys[0]; if(x>=xs[n-1]) return ys[n-1]+(ys[n-1]-ys[n-2])*(x-xs[n-1])/(xs[n-1]-xs[n-2]);
+  let i=0; while(xs[i+1]<x) i++; return ys[i]+(ys[i+1]-ys[i])*(x-xs[i])/(xs[i+1]-xs[i]); }
+function rcCorner(h){ return h<=1.6?0.216:h<=2.24?0.363:h<=3.55?0.55:h<=5.6?0.86:1.34; }
+function rcSigma(mat,T){ const c=RC.COND[mat]; return c.t90+(c.t115-c.t90)*(T-90)/25; }
+const r5=x=>Math.round(x/5)*5, rnd=(x,n)=>Math.round(x*10**n)/10**n;
+
+// ---- conductor geometry helpers ----
+function rcCond(c,ins){ // c:{type,b,h,rad,ax}
+  if(c.type==='round'){ const d=c.b; return {...c,h:d,bi:d+ins,hi:d+ins,cs:Math.PI/4*d*d*c.rad*c.ax,corner:0}; }
+  const corner=rcCorner(c.h); return {...c,bi:c.b+ins,hi:c.h+ins,cs:(c.b*c.h-corner)*c.rad*c.ax,corner};
+}
+let RC_EXTRA_TURN=1; // one extra conductor width per layer for the layer-to-layer crossover (strip and round)
+let RC_ROUND_LEN=false; // false = keep exact value (e.g. 138.33); true = ROUND(...,0) as in CAL1 cell B30
+function rcWindLen(C,tpl,extra){ const x=C.bi*C.ax*(tpl+RC_EXTRA_TURN)+extra; return RC_ROUND_LEN?Math.round(x):Math.round(x*100)/100; }
+function rcRadial(C,layers,ducts,ductW,il,bulge){ return rnd((C.hi*C.rad*layers+ducts*ductW+il*(layers-1))*bulge/5,1)*5; }
+
+function rectDesign(p){
+  RC_EXTRA_TURN=(p.extraTurn==null?1:p.extraTurn); RC_ROUND_LEN=!!p.roundLen;
+  const o={p,warn:[],checks:[]}; const sq3=Math.sqrt(3); const f=p.freq;
+  // Inner = lower voltage winding
+  const priLow=p.priV<=p.secV;
+  const W1={role:priLow?'Primary':'Secondary',V:priLow?p.priV:p.secV,conn:priLow?p.priConn:p.secConn};
+  const W2={role:priLow?'Secondary':'Primary',V:priLow?p.secV:p.priV,conn:priLow?p.secConn:p.priConn};
+  for(const w of [W1,W2]){ w.Vph=w.conn==='Y'?w.V/sq3:w.V; w.Iph=w.conn==='Y'?p.kVA*1000/(sq3*w.V):p.kVA*1000/(3*w.V); }
+  // V/t (sheet: 1.01 × √(kVA/3) × K/100)
+  const Vt0=1.01*Math.sqrt(p.kVA/3)*p.K/100;
+  let N1=p.N1||Math.round(W1.Vph/Vt0), N2=p.N2||Math.round(W2.Vph/Vt0);
+  const vr=W2.Vph/W1.Vph; let rerr=(vr-N2/N1)/vr*100;
+  if(!p.N1&&!p.N2&&Math.abs(rerr)>0.5){ let best=null; for(let n=Math.max(1,N1-4);n<=N1+4;n++){ const m=Math.round(n*vr); const e=(vr-m/n)/vr*100; const s=Math.abs(e)+Math.abs(n-W1.Vph/Vt0)*0.05; if(!best||s<best.s) best={n,m,e,s}; } N1=best.n; N2=best.m; rerr=best.e; }
+  const sheet=p.basis==='sheet';
+  const Vt=sheet?Vt0:W1.Vph/N1;
+  // Core
+  const sf=p.grade==='CRNO-35'?0.95:0.96;
+  const Areq=Vt/(4.44*f*p.B*1e-4); // cm²
+  const W=p.W; const D=p.D||Math.round(((Areq/sf)/(W*0.1))*10);
+  const Anet=sheet?Areq:W*D*sf/100; const Bact=Vt/(4.44*f*Anet*1e-4);
+  const cW=W+p.plateW, cD=D+p.plateD;
+  // Windings
+  const L1=p.lvLayers, L2=p.hvLayers; const tpl1=N1/L1, tpl2=N2/L2;
+  const C1=rcCond(p.lvCond,p.lvIns), C2=rcCond(p.hvCond,p.hvIns);
+  const len1=rcWindLen(C1,tpl1,p.lvTransp+p.lvComp+p.lvAxDucts), len2=rcWindLen(C2,tpl2,p.hvTransp+p.hvComp+p.hvAxDucts);
+  const imp1=len1-(C1.bi*C1.ax), imp2=sheet?Math.round(len2-C2.bi*C2.ax):len2-C2.bi*C2.ax;
+  const rad1=rcRadial(C1,L1,p.lvDucts,p.lvDuctW,p.lvIL,p.bulge), rad2=rcRadial(C2,L2,p.hvDucts,p.hvDuctW,p.hvIL,p.bulge);
+  let limb=Math.max(len1+p.lvEnd, len2+p.hvEndMin); if(p.limb) limb=p.limb;
+  const end2=limb-len2, end1=limb-len1;
+  // Build-up (widths across W and D directions, mm)
+  const ID1w=cW+p.gap, ID1d=cD+p.gap, OD1w=ID1w+2*rad1, OD1d=ID1d+2*rad1;
+  const ID2w=OD1w+p.delta, ID2d=OD1d+p.delta, OD2w=ID2w+2*rad2, OD2d=ID2d+2*rad2;
+  const Cd=p.Cdist||(OD2w+p.am); const yokeL=2*Cd+W; const winW=Cd-W;
+  const R1=p.gap/2, R2=R1+rad1, R3=R2+p.delta/2, R4=R3+rad2;
+  const per=R=>Math.round(2*W+2*cD+2*Math.PI*R);
+  const P1=per(R1),P2=per(R2),P3=per(R3),P4=per(R4);
+  const m1=(P1+P2)/2, mg=(P2+P3)/2, m2=(P3+P4)/2;
+  // Resistance, weights
+  const T=p.windTemp; const sig1=rcSigma(p.mat,T); const mat=RC.COND[p.mat];
+  const wire1=m1/1000*N1, wire2=m2/1000*N2;
+  const Rw1=wire1/(C1.cs*sig1), Rw2=wire2/(C2.cs*sig1);
+  const bare1=wire1*C1.cs*mat.dens*3/1000, bare2=wire2*C2.cs*mat.dens*3/1000;
+  const insA=(C)=>C.type==='round'?(Math.PI/4*(C.bi*C.bi-C.b*C.b)):(C.bi*C.hi-C.b*C.h);
+  const ins1=bare1+insA(C1)*C1.rad*C1.ax*wire1*2*3/1000, ins2=bare2+insA(C2)*C2.rad*C2.ax*wire2*2*3/1000;
+  // Impedance geometry
+  const h=(imp1+imp2)/2, bb=rad1+p.delta/2+rad2; const kr=1-1/((h/bb)*Math.PI); const Ls=h/kr;
+  const dP=(p.delta/2)*mg+(rad1*m1+rad2*m2)/3;
+  // Stray (eddy) loss
+  const sf1=mat.sf;
+  let st1,st2;
+  if(sheet){ st1=Math.pow((C1.h/10)*Math.sqrt((C1.b*(tpl1+1)*kr)/len1)*sf1,4)*((L1*C1.rad)**2/9)*100;
+             st2=Math.pow((C2.h/10)*Math.sqrt((C2.h*(tpl2+1)*kr)/len2)*sf1,4)*((L2*C2.rad)**2/9)*100; }
+  else { const fill=(C,tpl,len)=>Math.min(1,C.b*C.ax*(tpl+RC_EXTRA_TURN)*kr/len); const m=(L,C)=>L*C.rad; const k=(C)=>C.type==='round'?sf1*0.83:sf1;
+    st1=Math.pow((C1.h/10)*Math.sqrt(fill(C1,tpl1,len1))*k(C1),4)*((m(L1,C1))**2-0.2)/9*100; st2=Math.pow((C2.h/10)*Math.sqrt(fill(C2,tpl2,len2))*k(C2),4)*((m(L2,C2))**2-0.2)/9*100; }
+  const LL1=W1.Iph**2*Rw1*3*(1+st1/100), LL2=W2.Iph**2*Rw2*3*(1+st2/100); const tank=Math.ceil(p.kVA*p.tankWkVA);
+  const LL=LL1+LL2+tank;
+  const er=sheet?rnd((LL/p.kVA)*0.1,2):LL/(p.kVA*10);
+  const ex=(8*Math.PI**2*f*W1.Iph*N1*dP*1e-8)/(Ls*Vt); const ek=Math.sqrt(er*er+ex*ex);
+  // Core mass & loss
+  const coreMass=(limb*3+yokeL*2)*0.1*Anet*7.65e-3;
+  const spec=rcLookup(RC.CORELOSS.B,RC.CORELOSS[p.grade],Bact,sheet?'floor':'lin');
+  const NLL=coreMass*p.coreFactor*spec*p.buildF;
+  // No-load current
+  const vakg=rcLookup(RC.VAKG.B,RC.VAKG.v,Bact,sheet?'floor':'lin'); const vacm=11.823*Bact**3-44.891*Bact**2+61.585*Bact-29.304;
+  const mLimb=W*D*sf*limb*3*7.65e-6, mYoke=W*D*(Cd-W)*sf*4*7.65e-6, mCorner=W*W*D*sf*6*7.65e-6;
+  const vaLimb=vakg*mLimb, vaYoke=vakg*mYoke, vaCorner=6*vakg*mCorner, vaGap=6*vacm*W*D*sf*1e-2; const VA=vaLimb+vaYoke+vaCorner+vaGap; const I0=VA/(p.kVA*1000)*100;
+  const extraNL=((I0/100)*W2.Iph)**2*Rw2*3;
+  // Thermal
+  const S1=m1/1000*(imp1/1000)*(2+2*p.lvDucts), S2=m2/1000*(imp2/1000)*(2+2*p.hvDucts);
+  const q1=LL1/(3*S1), q2=LL2/(3*S2);
+  const rise1=15+q1/5, rise2=sheet?15+Math.round(q2/7):15+q2/7;
+  const hal=(q,len)=>Math.pow(q*Math.pow(len/1000,0.25)/1.4255,0.8);
+  const coreSa=((2*W+D)*yokeL+(W*D*4))*1e-2, wdgSa=m2*imp2*1e-2*3; const mcly=450*Math.pow((NLL+LL)/(coreSa+wdgSa),0.826);
+  // Mechanical
+  const aL=r5(2*Cd+(OD2w-W)), aB=r5(OD2d+p.leads), aH=r5(5+2*W+limb);
+  const oL=r5(aL+2*p.clrL), oB=r5(aB+2*p.clrB), oH=r5(aH+p.clrTop+p.clrBot);
+  // BOM
+  const bom=[]; const add=(k,q,pr)=>bom.push({k,q,pr,amt:q*pr});
+  const cond=rnd(ins1+ins2*1.025,1);
+  add('Core '+p.grade,coreMass,p.price.core); add('Core steel + SS',rnd(coreMass*0.1,1),p.price.coreSteel); add(mat.name+' conductor',cond,p.price.cond);
+  add('Leads',0.05*cond,p.price.leads); add('Insulation FG',0.12*cond,p.price.fg); add('Connection FG',4*aL/1000,p.price.connFg); add('Insulation Cl-H',0.025*cond,p.price.clh);
+  const s1=bom.reduce((a,x)=>a+x.q,0); add('Resin VT-50',s1*0.05,p.price.resin); const s2=bom.reduce((a,x)=>a+x.q,0); add('Misc',s2*0.05,0);
+  const crca=p.enclosure?(((oL+oB)*2*oH)+(oL*oB))*p.enclThk*1e-3*7.84e-3:0; add('CRCA enclosure',crca,p.price.crca);
+  const totMass=bom.reduce((a,x)=>a+x.q,0); const matCost=bom.reduce((a,x)=>a+x.amt,0); const others=matCost*p.price.others/100;
+  const rmc=Math.round((coreMass*260+cond*360)*1.5);
+  const eff=100*p.kVA*1000/(p.kVA*1000+NLL+LL), eff50=100*p.kVA*500/(p.kVA*500+NLL+0.25*LL);
+  const coreWdg=Math.round(1.135*(coreMass+bare1+bare2));
+  Object.assign(o,{W1,W2,Vt0,Vt,N1,N2,rerr,sf,Areq,Anet,W,D,Bact,cW,cD,L1,L2,tpl1,tpl2,C1,C2,len1,len2,imp1,imp2,rad1,rad2,limb,end1,end2,
+    ID1w,ID1d,OD1w,OD1d,ID2w,ID2d,OD2w,OD2d,Cd,yokeL,winW,R:[R1,R2,R3,R4],P:[P1,P2,P3,P4],m1,mg,m2,sig:sig1,wire1,wire2,Rw1,Rw2,bare1,bare2,ins1,ins2,
+    h,bb,kr,Ls,dP,st1,st2,LL1,LL2,tank,LL,er,ex,ek,coreMass,spec,NLL,vakg,vacm,mLimb,mYoke,mCorner,vaLimb,vaYoke,vaCorner,vaGap,VA,I0,extraNL,
+    S1,S2,q1,q2,rise1,rise2,hal1:hal(q1,imp1),hal2:hal(q2,imp2),coreSa,wdgSa,mcly,aL,aB,aH,oL,oB,oH,bom,totMass,matCost,others,cost:matCost+others,rmc,eff,eff50,coreWdg,
+    J1:W1.Iph/C1.cs,J2:W2.Iph/C2.cs});
+  // Compliance
+  const zLo=p.zTarget*(1-p.zTolMinus/100), zHi=p.zTarget*(1+p.zTolPlus/100);
+  o.zLo=zLo; o.zHi=zHi;
+  const chk=(name,req,got,ok)=>o.checks.push({name,req,got,ok});
+  chk('Impedance @'+T+' °C',p.zTarget+' % (+'+p.zTolPlus+' / −'+p.zTolMinus+' %) → '+rnd(zLo,2)+'–'+rnd(zHi,2)+' %',rnd(ek,2)+' %',ek>=zLo-1e-9&&ek<=zHi+1e-9);
+  chk('Efficiency @'+T+' °C, 100 % load','> '+p.effMin+' %',rnd(eff,2)+' %',eff>p.effMin);
+  chk('Winding temperature rise (inner / outer)','≤ '+p.riseLimit+' K at '+p.amb+' °C ambient',rnd(rise1,1)+' / '+rnd(rise2,1)+' K',Math.max(rise1,rise2)<=p.riseLimit);
+  chk('Hot-spot vs insulation class',p.insClass+' ('+({B:130,F:155,H:180}[p.insClass])+' °C)',rnd(p.amb+Math.max(rise1,rise2)*1.1,0)+' °C est.',p.amb+Math.max(rise1,rise2)*1.1<={B:130,F:155,H:180}[p.insClass]);
+  chk('Turns-ratio error','≤ 0.5 % (IS 2026)',rnd(rerr,3)+' %',Math.abs(rerr)<=0.5);
+  chk('Flux density','≤ 1.55 T for low noise',rnd(Bact,3)+' T',Bact<=1.55);
+  chk('Noise level (estimate)','≤ '+p.noiseMax+' dB',Bact<=1.45?'Low flux — expected within limit':'Verify at test',Bact<=1.45);
+  chk('Current density inner / outer',p.mat==='Al'?'≤ 1.8 A/mm² (Al)':'≤ 3.0 A/mm² (Cu)',rnd(o.J1,3)+' / '+rnd(o.J2,3),Math.max(o.J1,o.J2)<=(p.mat==='Al'?1.8:3.0));
+  for(const c of o.checks) if(!c.ok) o.warn.push(c.name+': required '+c.req+', obtained '+c.got+'.');
+  if(C1.type==='strip'&&(C1.b/C1.h<1.2)) o.warn.push('Inner strip breadth/height ratio is low; check winding practicality.');
+  if(end2<p.hvEndMin-1e-6) o.warn.push('Outer winding end clearance is below the minimum.');
+  return o;
+}
+
+// ---------- Auto design ----------
+function rcPickCond(N,I,J,Ltarget,ins,il,fixed,maxLayers){
+  let best=null; const A=I/J;
+  const layers=fixed.layers?[fixed.layers]:Array.from({length:maxLayers},(_,i)=>i+1);
+  for(const L of layers){ const tpl=N/L;
+    if(A<=8 && !fixed.strip){ for(const ax of [1,2]){ const d0=Math.sqrt(4*A/Math.PI/ax); const d=Math.ceil(d0*20)/20; if(d<0.8||d>4) continue; const C=rcCond({type:'round',b:d,h:d,rad:1,ax},ins); const len=rcWindLen(C,tpl,0);
+      if(len>Ltarget*1.02||len<Ltarget*0.85) continue; const rad=C.hi*L+il*(L-1); const s=rad+Math.abs(len-Ltarget)*0.05+ax*0.3; if(!best||s<best.s) best={s,L,C,len}; } }
+    for(const ax of [1,2,3,4]) for(const rad of [1,2]){ const biMax=Ltarget/(ax*(tpl+1)); const b=Math.floor((biMax-ins)*2)/2; if(b<4||b>16) continue;
+      const per=A/(ax*rad); let h=Math.ceil(((per+rcCorner(per/b))/b)*10)/10; if(h<0.8||h>5.6||b/h<1.3) continue;
+      const C=rcCond({type:'strip',b,h,rad,ax},ins); const len=rcWindLen(C,tpl,0); const radial=C.hi*rad*L+il*(L-1);
+      const s=radial+Math.abs(len-Ltarget)*0.05+(ax*rad-1)*0.6+(L>1?0:0.5); if(!best||s<best.s) best={s,L,C,len}; } }
+  return best;
+}
+function rectAuto(p){
+  const mat=p.mat; const base={...p};
+  const Ks=p.K?[p.K]:[55,60,65,70,75,80,85,90,95,100,110];
+  const J1=p.J1||(mat==='Al'?1.4:2.3), J2=p.J2||(mat==='Al'?1.5:2.5);
+  let best=null,bestS=Infinity,count=0;
+  const zc=p.zTarget*(1-(p.zTolMinus-p.zTolPlus)/200);
+  for(const K of Ks){
+    const probe=rectDesign({...base,K,W:80,lvLayers:1,hvLayers:1,lvCond:{type:'strip',b:10,h:3,rad:1,ax:1},hvCond:{type:'strip',b:10,h:3,rad:1,ax:1}});
+    const N1=probe.N1,N2=probe.N2, I1=probe.W1.Iph, I2=probe.W2.Iph; const Areq=probe.Areq, sf=probe.sf;
+    const Ws=p.W?[p.W]:RC.LAM.filter(w=>{const D=Areq/sf/(w*0.1)*10; return D/w>=1.1&&D/w<=2.6;});
+    const bothFixed=p.lvCondFixed&&p.hvCondFixed;
+    for(let Lt=100;Lt<=900;Lt+=10){ if(bothFixed&&Lt>100) break;
+      const c1=(p.lvCondFixed)?{L:p.lvLayers,C:rcCond(p.lvCondFixed,p.lvIns)}:rcPickCond(N1,I1,J1,Lt,p.lvIns,p.lvIL,{layers:p.lvLayers},8);
+      const c2=(p.hvCondFixed)?{L:p.hvLayers,C:rcCond(p.hvCondFixed,p.hvIns)}:rcPickCond(N2,I2,J2,Lt,p.hvIns,p.hvIL,{layers:p.hvLayers},10);
+      if(!c1||!c2) continue;
+      for(const W of Ws){
+        for(const d1 of (p.lvDucts!=null?[p.lvDucts]:[0,1,2])){ let o=null,okDuct=false;
+          for(const d2 of (p.hvDucts!=null?[p.hvDucts]:[0,1,2])){
+            o=rectDesign({...base,K,W,D:p.W?p.D:null,lvLayers:c1.L,hvLayers:c2.L,lvCond:c1.C,hvCond:c2.C,lvDucts:d1,hvDucts:d2,N1:p.N1||null,N2:p.N2||null}); count++;
+            if(o.rise2<=p.riseLimit) {okDuct=true;break;} }
+          let s=0; if(o.ek<o.zLo||o.ek>o.zHi) s+=100+50*Math.abs(o.ek-zc)/p.zTarget; else s+=8*Math.abs(o.ek-zc)/p.zTarget;
+          const rmax=Math.max(o.rise1,o.rise2); if(rmax>p.riseLimit) s+=60+(rmax-p.riseLimit);
+          if(o.eff<=p.effMin) s+=80+(p.effMin-o.eff)*20;
+          if(Math.abs(o.rerr)>0.5) s+=40; if(o.Bact>1.6) s+=30;
+          s+= o.cost/(p.kVA*1000)*p.wCost + (o.NLL+o.LL)/(p.kVA*10)*p.wLoss + (d1+o.p.hvDucts)*0.3;
+          if(s<bestS){bestS=s;best=o;}
+          if(o.rise1<=p.riseLimit) break; }
+      }
+    }
+  }
+  if(best) best.searched=count;
+  return best;
+}
+const RC_DEFAULTS={kVA:70,freq:50,priV:433,priConn:'D',secV:400,secConn:'Y',vg:'Dyn11',mat:'Al',grade:'M4-27',insClass:'H',
+  zTarget:3,zTolPlus:0,zTolMinus:10,effMin:97,riseLimit:115,amb:50,windTemp:115,noiseMax:50,basis:'sheet',
+  K:79,B:1.4,W:80,D:null,plateW:0,plateD:4,gap:12,delta:12,am:15,lvEnd:40,hvEndMin:40,limb:null,Cdist:null,
+  lvLayers:4,hvLayers:4,lvCond:{type:'strip',b:10.5,h:3.5,rad:1,ax:2},hvCond:{type:'strip',b:10.5,h:3.5,rad:1,ax:1},lvIns:0.11,hvIns:0.11,lvIL:0.13,hvIL:0.13,
+  extraTurn:1,roundLen:false,lvDucts:0,hvDucts:0,lvDuctW:8,hvDuctW:8,lvAxDucts:0,hvAxDucts:0,lvTransp:0,hvTransp:0,lvComp:0,hvComp:0,bulge:1.1,
+  tankWkVA:1.5,coreFactor:1.32,buildF:1.5,leads:0,clrL:250,clrB:260,clrTop:250,clrBot:75,enclosure:false,enclThk:2,
+  price:{core:270,coreSteel:200,cond:440,leads:440,fg:500,connFg:500,clh:5950,resin:650,crca:90,others:15},wCost:1,wLoss:0.5};
+
+
+</script>
+<script>
+const $=(s,el=document)=>el.querySelector(s), $$=(s,el=document)=>[...el.querySelectorAll(s)];
+const form=$('#f');
+const MAT_DEF={Cu:{k:0.50,Jlv:2.2,Jhv:2.4},Al:{k:0.43,Jlv:1.4,Jhv:1.5}};
+const BASE={kVA:500,freq:50,hvV:11000,lvV:415,vg:'Dyn11',insClass:'F',lvMat:'Cu',hvMat:'Cu',k:0.50,B:1.60,Jlv:2.2,Jhv:2.4,tapPlus:5,tapMinus:5,tapStep:2.5,zTarget:5,
+  grade:'M4-0.27',joint:'mitred',refTemp:75,enclosure:'1',hvCond:'auto',party:'',wo:'',ref:'',by:'',appr:''};
+const PRESETS={
+  blank:BASE,
+  p500:{...BASE,kVA:500,k:0.56,B:1.64,Jlv:2.0,Jhv:2.4,tapPlus:2.5,tapMinus:7.5,tapStep:2.5,window:650,lvEnd:110,hvEnd:140,lvAx:4,lvRad:2,lvDucts:1,lvDuctT:10,
+    hvCoils:6,hvCond:'round',hvDucts:0,lvhvGap:31,phaseGap:31,ref:'500 kVA 11000/415 V Class F'},
+  p600:{...BASE,kVA:600,vg:'Ynd11',insClass:'H',lvMat:'Al',hvMat:'Al',k:0.4236,B:1.55,Jlv:1.55,Jhv:1.62,tapPlus:0,tapMinus:0,tapStep:0,zTarget:6,refTemp:115,
+    window:995,lvEnd:130,hvEnd:140,lvAx:3,lvRad:2,lvTransp:20,lvDucts:1,lvDuctT:12,hvCoils:1,hvCond:'strip',hvDucts:2,hvDuctT:12,hvMinIns:0.26,lvhvGap:29,phaseGap:43,
+    ref:'600 kVA 11000/415 V Class H'},
+  p1600:{...BASE,kVA:1600,k:0.428,B:1.596,Jlv:2.33,Jhv:2.14,tapPlus:5,tapMinus:5,tapStep:2.5,zTarget:6.25,refTemp:90,window:1217,lvEnd:60,hvEnd:140,lvDucts:1,lvDuctT:16,
+    hvCoils:8,hvCond:'strip',lvhvGap:50,phaseGap:60,ref:'1600 kVA 11000/415 V Class F'}
+};
+const NUM=new Set(['kVA','freq','hvV','lvV','k','B','Jlv','Jhv','tapPlus','tapMinus','tapStep','zTarget','refTemp','window','coreDia','lvEnd','hvEnd','lvTurns','lvLayers','lvAx','lvRad','lvTransp','lvDucts','lvDuctT','coreLV','hvCoils','hvDucts','hvDuctT','lvhvGap','phaseGap','hvCoilGap','hvMinIns','lvIns','hvInsRound','hvInsStrip','enclClr']);
+function loadPreset(key){ const p=PRESETS[key]; for(const el of form.elements){ if(!el.name) continue; const v=p[el.name]; el.value=(v===undefined||v===null)?'':v; } run(); }
+function readInputs(){
+  const v={}; for(const el of form.elements){ if(!el.name) continue; const s=el.value.trim(); v[el.name]=NUM.has(el.name)?(s===''?null:parseFloat(s)):s; }
+  const vg=v.vg; const hvConn=vg[0]==='D'?'D':'Y'; const lvConn=/d/.test(vg.slice(1))?'D':'Y';
+  const p={...DEFAULTS_AUTO,...Object.fromEntries(Object.entries(v).filter(([k,x])=>x!==null&&x!==''))};
+  p.hvConn=hvConn; p.lvConn=lvConn; p.enclosure=v.enclosure==='1';
+  ['window','coreDia','lvEnd','hvEnd','lvTurns','lvLayers','lvAx','lvRad','lvDucts','lvDuctT','hvCoils','hvDucts','lvhvGap','phaseGap'].forEach(k=>{ if(v[k]===null) p[k]=null; });
+  if(p.lvAx&&!p.lvRad) p.lvRad=1; if(p.lvRad&&!p.lvAx) p.lvAx=null;
+  return {p,meta:v};
+}
+const DEFAULTS_AUTO={sf:0.97,lvTransp:30,lvIns:0.3,lvMinIns:0.1,lvTol:0.3,coreLV:10,hvCoilGap:12,hvCond:'auto',hvInsRound:0.2,hvInsStrip:0.44,hvMinIns:0.05,hvTol:0.1,
+  hvDuctT:12,Eb:10000,hdInner:6,hdOuter:8,enclClr:200,bottomClr:100,refTemp:75,tapStep:2.5,tapPlus:0,tapMinus:0};
+// Auto-update k & J when material changes
+form.addEventListener('change',e=>{ if(e.target.name==='lvMat'){ const d=MAT_DEF[e.target.value]; form.k.value=d.k; form.Jlv.value=d.Jlv; } if(e.target.name==='hvMat'){ form.Jhv.value=MAT_DEF[e.target.value].Jhv; } });
+let timer; form.addEventListener('input',()=>{ clearTimeout(timer); timer=setTimeout(run,250); }); form.addEventListener('change',()=>{ clearTimeout(timer); run(); });
+
+const f1=(x,n=1)=>(x==null||isNaN(x))?'–':Number(x).toFixed(n);
+const f0=x=>(x==null||isNaN(x))?'–':Math.round(x).toLocaleString('en-IN');
+let CUR=null;
+
+function buildModel(o,m){
+  const p=o.inp, lv=o.lv, hv=o.hv, c=o.core, H=hv.cond, T=p.refTemp;
+  const vg=m.vg, date=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+  const title={title:'Electrical design calculation — '+p.kVA+' kVA '+p.hvV+' / '+p.lvV+' V, indoor dry type, class '+p.insClass,
+    cells:[['Party',m.party||'—'],['Work order',m.wo||'—'],['Design ref.',m.ref||(p.kVA+' kVA '+p.hvV+'/'+p.lvV+' V')],['Date',date],
+      ['Rating',p.kVA+' kVA, 3 phase'],['Voltage ratio',p.hvV+' / '+p.lvV+' V'],['Vector group',vg],['Frequency',p.freq+' Hz'],
+      ['Cooling','AN (natural air)'],['Insulation class',p.insClass+' ('+o.rise+' K rise)'],['Standards','IS 11171, IS 2026'],['Designed / approved',(m.by||'—')+' / '+(m.appr||'—')]]};
+  const core=[['Frame (D / window / centres)',c.D+' / '+o.window+' / '+c.CD+' mm'],['Core diameter',c.D+' mm, '+c.steps.length+' steps'],
+    ['Net core area',f1(c.Anet/100,2)+' cm²'],['Stacking factor',p.sf],['Core utilisation (steps/circle)',f1(c.util*100,1)+' %'],
+    ['Volts / turn',f1(lv.V/lv.N,4)+' V'],['Flux density',f1(c.B,3)+' T ('+f0(c.B*10000)+' G)'],['Steel grade / joint',p.grade+' / '+(p.joint==='step'?'step-lap':'mitred')],
+    ['Core mass',f0(c.W)+' kg'],['Specific loss × build factor',f1(c.sl,3)+' W/kg × '+c.bf],['No-load loss (calc.)',f0(c.NLL)+' W']];
+  const hvType=H.type==='round'?'Multi-layer coils, round wire':'Multi-layer coils, strip';
+  const tv=o.cls; const lvCls=p.lvV<=1100;
+  const wind=[
+    ['Connection',(p.lvConn==='D'?'Delta':'Star')+', helical strip',(p.hvConn==='D'?'Delta':'Star')+', '+hvType.toLowerCase()],
+    ['Rated voltage (line / phase)',p.lvV+' / '+f1(lv.V,1)+' V',p.hvV+' / '+f1(hv.V,1)+' V'],
+    ['Rated current / phase',f1(lv.I,2)+' A',f1(hv.I,3)+' A (min tap '+f1(hv.Imin,3)+')'],
+    ['Turns / limb',String(lv.N),hv.Nmax+' – '+hv.Nn+' – '+hv.Nmin+' (max–nor–min)'],
+    ['Conductor bare',lv.b+' × '+lv.h+' mm',H.type==='round'?'Ø '+H.d.toFixed(2)+' mm':H.w+' × '+H.t.toFixed(2)+' mm'],
+    ['Conductor insulated',f1(lv.bi,2)+' × '+f1(lv.hi,2)+' mm',H.type==='round'?'Ø '+(H.d+H.ins).toFixed(2)+' mm':f1(H.w+H.ins,2)+' × '+f1(H.t+H.ins,2)+' mm'],
+    ['Conductor insulation',lv.ins+' mm',H.ins+' mm'],
+    ['No. in parallel',lv.a+' axial × '+lv.r+' radial',H.np+' axial × 1 radial'],
+    ['Cross section',f1(lv.cs,2)+' mm²',f1(H.cs,3)+' mm²'],
+    ['Current density',f1(lv.J,3)+' A/mm²',f1(hv.J,3)+' / '+f1(hv.Jmin,3)+' A/mm² (nor / min)'],
+    ['Coils / phase','1',String(hv.coils)],
+    ['Turns / coil',String(lv.N),String(hv.tpc)],
+    ['Layers',String(lv.layers),hv.layers+' per coil'],
+    ['Turns / layer',f1(lv.tpl,2),String(hv.tpl)],
+    ['Inter-layer insulation',f1(lv.IL,2)+' mm',f1(hv.IL,2)+' mm'],
+    ['Axial air ducts',lv.ducts+' × '+lv.ductT+' mm',hv.ducts+' × '+hv.ductT+' mm'],
+    ['Transposition',lv.transp+' mm','—'],
+    ['Available winding length',f0(lv.Lw)+' mm',f0(hv.Lw)+' mm (coil '+f1(hv.coilLen,1)+')'],
+    ['Wound length',f0(lv.wound)+' mm',f0(hv.wound)+' mm'],
+    ['End clearance',lv.end+' × 2 mm',hv.end+' × 2 mm'],
+    ['Radial thickness',f1(lv.rad,1)+' mm',f1(hv.rad,1)+' mm'],
+    ['ID / OD',lv.ID+' / '+lv.OD+' mm',hv.ID+' / '+hv.OD+' mm'],
+    ['Mean turn length',f1(lv.LMT,4)+' m',f1(hv.LMT,4)+' m'],
+    ['Wire length (procurement)',f0(lv.wire)+' m',f0(hv.wire)+' m'],
+    ['Resistance / phase @'+T+' °C',f1(lv.R*1000,4)+' mΩ',f1(hv.R,4)+' Ω'],
+    ['Resistance / phase @20 °C',f1(lv.R20*1000,4)+' mΩ',f1(hv.R20,4)+' Ω'],
+    ['Conductor bare / insulated',f1(lv.bare,1)+' / '+f1(lv.insW,1)+' kg',f1(hv.bare,1)+' / '+f1(hv.insW,1)+' kg'],
+    ['Procurement weight',f1(lv.proc,1)+' kg',f1(hv.proc,1)+' kg'],
+    ['Stray loss',f1(lv.stray,3)+' %',f1(hv.stray,3)+' %'],
+    ['Load loss @'+T+' °C',f0(lv.LL)+' W',f0(hv.LL)+' / '+f0(hv.LLmin)+' W (nor / min)'],
+    ['Winding gradient',f1(lv.grad,1)+' °C',f1(hv.grad,1)+' °C'],
+    ['Test voltage PF / LI',lvCls?'3 kV / —':'—',tv.pf+' kV / '+tv.li+' kVp']];
+  const perf=[['No-load loss',f0(o.loss.NLL)+' W'],['Load loss, normal tap',f0(o.loss.LL)+' W'],['Load loss, lowest tap',f0(o.loss.LLmin)+' W'],
+    ['Total loss, normal tap',f0(o.loss.total)+' W'],['Reactance ex',f1(o.imp.ex,3)+' %'],['Resistance er',f1(o.imp.er,3)+' %'],['Impedance ez',f1(o.imp.ek,3)+' %'+(p.zTarget?' (target '+p.zTarget+' %)':'')],
+    ['Ampere-turns / Ls / k_r',f0(o.imp.AT)+' / '+f1(o.imp.Ls/10,2)+' cm / '+f1(o.imp.kr,3)],['Efficiency, 100 % / 50 % load, pf 1',f1(o.loss.eff100,2)+' / '+f1(o.loss.eff50,2)+' %'],
+    ['Temperature rise limit','Class '+p.insClass+': '+o.rise+' K']];
+  const clr=[['Core to LV',p.coreLV+' mm'],['LV to HV (radial)',hv.gap+' mm'],['HV to HV (phase)',hv.phase+' mm'],['HV coil to coil',hv.coilGap+' mm'],['LV / HV end',lv.end+' / '+hv.end+' mm'],['Insulation level','Um '+o.cls.um+' kV']];
+  const wts=[['Active part L × B × H',f0(o.dims.activeL)+' × '+f0(o.dims.activeB)+' × '+f0(o.dims.activeH)+' mm'],
+    ['Enclosure L × B × H',p.enclosure?(f0(o.dims.eL)+' × '+f0(o.dims.eB)+' × '+f0(o.dims.eH)+' mm'):'—'],
+    ['Core',f0(o.wts.core)+' kg'],[lv.mat.name+' LV (insulated)',f0(o.wts.lv)+' kg'],[hv.mat.name+' HV (insulated)',f0(o.wts.hv)+' kg'],['Core clamps (est.)',f0(o.wts.clamps)+' kg'],
+    ['Insulation, leads, resin (est.)',f0(o.wts.insMisc)+' kg'],['Core-coil assembly',f0(o.wts.active)+' kg'],['Enclosure & fittings (est.)',p.enclosure?f0(o.wts.encl)+' kg':'—'],['Total mass',f0(o.wts.total)+' kg']];
+  const taps=hv.taps.map((t,i)=>[String(i+1),(t.pct>0?'+':'')+t.pct+' %',f0(p.hvV*(1+t.pct/100))+' V',String(t.N)]);
+  const coreSteps=c.steps.map((s,i)=>[String(i+1),String(s.w),f1(s.stack,1),f0(s.net)]);
+  return {title,core,wind,perf,clr,wts,taps,coreSteps,steps:o.steps,warn:o.warn};
+}
+
+function tbl(rows,head){ return '<table>'+(head?'<tr>'+head.map(h=>'<th>'+h+'</th>').join('')+'</tr>':'')+rows.map(r=>'<tr>'+r.map((c,i)=>i===0?'<th>'+esc(c)+'</th>':'<td>'+esc(c)+'</td>').join('')+'</tr>').join('')+'</table>'; }
+function esc(s){ return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+function renderSheet(M){
+  const t=M.title;
+  $('#sheet').innerHTML='<div class="titleblock"><div class="big">'+esc(t.title)+'</div>'+t.cells.map(c=>'<div><span>'+c[0]+'</span>'+esc(c[1])+'</div>').join('')+'</div>'+
+  '<div class="cols"><div><h3>Winding data</h3>'+tbl(M.wind,['Parameter','LV (inner)','HV (outer)'])+'</div><div>'+
+  '<h3>Core data</h3>'+tbl(M.core)+'<h3>Performance</h3>'+tbl(M.perf)+'<h3>Clearances</h3>'+tbl(M.clr)+'<h3>Dimensions and bill of mass</h3>'+tbl(M.wts)+
+  '<h3>HV tapping</h3>'+tbl(M.taps,['Tap','Setting','HV volts','Turns'])+'<h3>Core steps</h3>'+tbl(M.coreSteps,['Step','Width, mm','Stack, mm','Net area, mm²'])+'</div></div>';
+  const grp={1:'Volts per turn',4:'Core',7:'LV winding',26:'HV winding',41:'Core weight and loss',43:'Impedance, enclosure and weights'};
+  $('#steps').innerHTML='<table><tr><th>Step</th><th>Item</th><th>Working</th><th>Result</th></tr>'+M.steps.map(s=>(grp[s.n]?'<tr class="grp"><td colspan="4">'+grp[s.n]+'</td></tr>':'')+
+    '<tr><td>'+s.n+'</td><td>'+esc(s.title)+'</td><td class="formula">'+esc(s.formula)+(s.note?'<span class="note">'+esc(s.note)+'</span>':'')+'</td><td class="r">'+esc(s.result)+'</td></tr>').join('')+'</table>';
+}
+function renderKpis(o){
+  const p=o.inp; const zbad=p.zTarget&&Math.abs(o.imp.ek-p.zTarget)/p.zTarget>0.1;
+  const k=[['Core diameter',o.core.D,'mm'],['Flux density',f1(o.core.B,3),'T',o.core.B>1.7],['No-load loss',f0(o.loss.NLL),'W'],['Load loss @'+p.refTemp+' °C',f0(o.loss.LL),'W'],
+    ['Impedance',f1(o.imp.ek,2),'%',zbad],['LV / HV gradient',f1(o.lv.grad,0)+' / '+f1(o.hv.grad,0),'°C',Math.max(o.lv.grad,o.hv.grad)>o.rise],['Efficiency',f1(o.loss.eff100,2),'%'],['Total mass',f0(o.wts.total),'kg']];
+  $('#kpis').innerHTML=k.map(x=>'<div class="kpi'+(x[3]?' bad':'')+'"><span>'+x[0]+'</span><strong>'+x[1]+'</strong><em>'+x[2]+'</em></div>').join('');
+  const w=$('#warns'); w.classList.toggle('on',o.warn.length>0); $('ul',w).innerHTML=o.warn.map(x=>'<li>'+esc(x)+'</li>').join('');
+  $('#okline').classList.toggle('on',o.warn.length===0);
+}
+function renderSVG(o){
+  // Axial direction drawn horizontally (z), radial vertically (r measured from limb centre line).
+  const c=o.core,lv=o.lv,hv=o.hv, Hw=o.window, yoke=c.yoke; const Rmax=hv.OD/2+30;
+  const padL=20,padT=40,Z=2*yoke+Hw,Wd=Z+padL*2+140,Hd=2*Rmax+padT*2+20; const cy=padT+Rmax;
+  const fs=Math.max(13,Wd/75);
+  const R=(z,r,zl,rl,fill,op)=>'<rect x="'+(padL+z)+'" y="'+(cy+r)+'" width="'+zl+'" height="'+rl+'" fill="'+fill+'"'+(op?' opacity="'+op+'"':'')+'/>';
+  let s='<svg viewBox="0 0 '+Wd+' '+Hd+'" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Section of one limb, to scale" font-family="Barlow, Arial" font-size="'+fs+'" style="color:var(--ink)">';
+  s+=R(0,-Rmax,yoke,2*Rmax,'#5C6B78',.35)+R(yoke+Hw,-Rmax,yoke,2*Rmax,'#5C6B78',.35)+R(0,-c.D/2,Z,c.D,'#5C6B78',.6);
+  for(const sg of [-1,1]){
+    const lvr=sg<0?-lv.OD/2:lv.ID/2; s+=R(yoke+lv.end,lvr,Hw-2*lv.end,lv.rad,'#C08A1E',.9);
+    if(lv.ducts){ const per=(lv.rad-lv.ducts*lv.ductT)/(lv.ducts+1); for(let k=1;k<=lv.ducts;k++){ const off=k*per+(k-1)*lv.ductT; s+=R(yoke+lv.end,sg<0?-lv.OD/2+off:lv.ID/2+off,Hw-2*lv.end,lv.ductT,'var(--panel)'); } }
+    const hvr=sg<0?-hv.OD/2:hv.ID/2;
+    for(let k=0;k<hv.coils;k++){ const z0=yoke+hv.end+k*(hv.coilLen+hv.coilGap); s+=R(z0,hvr,hv.coilLen,hv.rad,'#9B4A26',.9);
+      if(hv.ducts){ const per=(hv.rad-hv.ducts*hv.ductT)/(hv.ducts+1); for(let d=1;d<=hv.ducts;d++){ const off=d*per+(d-1)*hv.ductT; s+=R(z0,sg<0?-hv.OD/2+off:hv.ID/2+off,hv.coilLen,hv.ductT,'var(--panel)'); } } }
+  }
+  s+='<line x1="'+padL+'" y1="'+cy+'" x2="'+(padL+Z)+'" y2="'+cy+'" stroke="currentColor" stroke-dasharray="14 6 3 6" stroke-width="1"/>';
+  const vdim=(x,r1,r2,t)=>{const y1=cy+r1,y2=cy+r2;return '<line x1="'+x+'" y1="'+y1+'" x2="'+x+'" y2="'+y2+'" stroke="currentColor" stroke-width="1.4"/><line x1="'+(x-7)+'" y1="'+y1+'" x2="'+(x+7)+'" y2="'+y1+'" stroke="currentColor"/><line x1="'+(x-7)+'" y1="'+y2+'" x2="'+(x+7)+'" y2="'+y2+'" stroke="currentColor"/><text x="'+(x+10)+'" y="'+((y1+y2)/2+fs/3)+'" fill="currentColor">'+t+'</text>';};
+  const xr=padL+Z+14; s+=vdim(xr,-c.D/2,c.D/2,'Ø'+c.D)+vdim(xr+60,-hv.OD/2,-hv.ID/2,'HV '+hv.rad);
+  s+=vdim(xr+60,lv.ID/2,lv.OD/2,'LV '+lv.rad);
+  s+='<line x1="'+(padL+yoke)+'" y1="'+(padT-18)+'" x2="'+(padL+yoke+Hw)+'" y2="'+(padT-18)+'" stroke="currentColor" stroke-width="1.4"/><text x="'+(padL+yoke+Hw/2)+'" y="'+(padT-24)+'" text-anchor="middle" fill="currentColor">Window '+Hw+' mm</text>';
+  s+='<text x="'+(padL+yoke+Hw/2)+'" y="'+(cy+fs/3)+'" text-anchor="middle" fill="#fff" font-weight="600">Core limb</text>';
+  s+='<text x="'+(padL+yoke+8)+'" y="'+(cy-hv.OD/2-8)+'" fill="#9B4A26" font-weight="600">HV, '+hv.coils+' coil'+(hv.coils>1?'s':'')+(hv.ducts?' + '+hv.ducts+' duct'+(hv.ducts>1?'s':''):'')+'</text>';
+  s+='<text x="'+(padL+yoke+Hw-8)+'" y="'+(cy-lv.OD/2-6)+'" text-anchor="end" fill="#A0741A" font-weight="600">LV, '+lv.layers+' layers + '+lv.ducts+' duct'+(lv.ducts!==1?'s':'')+'</text>';
+  s+='</svg>'; $('#svgwrap').innerHTML=s;
+}
+function run(){
+  if(!form.kVA.value||!form.hvV.value||!form.lvV.value){ return; }
+  try{ const {p,meta}=readInputs(); const o=designAuto(p); const M=buildModel(o,meta); CUR={o,M,meta}; renderKpis(o); renderSheet(M); renderSVG(o); }
+  catch(e){ console.error(e); $('#warns').classList.add('on'); $('#warns ul').innerHTML='<li>These inputs cannot be designed: '+esc(e.message)+'. Check the voltages and advanced fields.</li>'; }
+}
+// tabs
+$$('#layout-round .tabs button').forEach(b=>b.addEventListener('click',()=>{ $$('#layout-round .tabs button').forEach(x=>x.setAttribute('aria-selected',x===b)); $('#tab-sheet').hidden=b.dataset.tab!=='sheet'; $('#tab-steps').hidden=b.dataset.tab!=='steps'; }));
+$$('[data-preset]').forEach(b=>b.addEventListener('click',()=>loadPreset(b.dataset.preset)));
+function toast(t){ const el=$('#toast'); el.textContent=t; el.classList.add('on'); setTimeout(()=>el.classList.remove('on'),2600); }
+const dlP=(window.claude&&window.claude.use)?window.claude.use('downloads').catch(()=>null):Promise.resolve(null);
+async function saveFile(name,blob){
+  const dl=await Promise.race([dlP,new Promise(r=>setTimeout(()=>r(undefined),1500))]);
+  if(dl){ try{ await dl.save({filename:name,data:blob}); toast('Saved '+name); }catch(e){ if(e&&e.code==='declined') return; toast('Could not save the file ('+(e&&e.code||'error')+').'); } return; }
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1000); toast('Downloaded '+name);
+}
+function fname(ext){ const p=CUR.o.inp; return 'Design_'+p.kVA+'kVA_'+Math.round(p.hvV/100)/10+'kV_'+p.lvV+'V.'+ext; }
+function pdfText(s){ return String(s).replace(/−/g,'-').replace(/δ/g,'delta').replace(/′/g,"'").replace(/₹/g,'Rs').replace(/■/g,'').replace(/Ω/g,'Ohm').replace(/Ø/g,'dia ').replace(/≈/g,'~').replace(/√/g,'sqrt').replace(/×/g,'x').replace(/÷/g,'/').replace(/²/g,'2').replace(/⁴/g,'^4').replace(/⁻⁶/g,'^-6').replace(/⁻³/g,'^-3').replace(/⁻¹/g,'^-1').replace(/·/g,'.').replace(/–|—/g,'-').replace(/₇₅/g,'75').replace(/°/g,' deg ').replace(/ deg C/g,' degC').replace(/ρ/g,'rho').replace(/π/g,'pi').replace(/ⁱ/g,'').replace(/[^\x00-\xFF]/g,''); }
+$('#dlPdf').addEventListener('click',()=>{
+  if(!CUR) return; if(!window.jspdf){ toast('PDF library did not load. Check your connection and reload.'); return; }
+  const {jsPDF}=window.jspdf; const d=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'}); const M=CUR.M; const P=v=>v.map(r=>r.map(pdfText));
+  const ink=[23,33,43], head=[228,233,238];
+  const base={theme:'grid',styles:{fontSize:7,cellPadding:1,lineColor:[150,160,170],lineWidth:0.15,textColor:ink},headStyles:{fillColor:head,textColor:ink,fontStyle:'bold'},columnStyles:{0:{fontStyle:'bold'}}};
+  // title block
+  d.setDrawColor(...ink); d.setLineWidth(0.5); d.rect(8,8,281,20); d.setFont('helvetica','bold'); d.setFontSize(11); d.text(pdfText(M.title.title),10,13);
+  d.setFont('helvetica','normal'); d.setFontSize(6.6); M.title.cells.forEach((c,i)=>{ const x=10+(i%6)*46.5, y=18+Math.floor(i/6)*5; d.setTextColor(90); d.text(pdfText(c[0]),x,y); d.setTextColor(...ink); d.text(pdfText(c[1]).slice(0,40),x,y+2.6); });
+  d.autoTable({...base,startY:31,margin:{left:8,right:150},head:[['Winding data','LV (inner)','HV (outer)']],body:P(M.wind),columnStyles:{0:{fontStyle:'bold',cellWidth:38}}});
+  let y=31; const R={...base,margin:{left:152,right:8}};
+  const sec=(h,body,head2)=>{ d.autoTable({...R,startY:y,head:[head2||[h,'']],body:P(body)}); y=d.lastAutoTable.finalY+1.5; };
+  sec('Core data',M.core); sec('Performance',M.perf); sec('Dimensions and bill of mass',M.wts);
+  d.setFontSize(6); d.setTextColor(90); d.text('Estimated values marked (est.). Generated '+new Date().toLocaleString('en-GB')+'  |  Page 1',8,205);
+  // page 2
+  d.addPage(); d.setTextColor(...ink); d.setFont('helvetica','bold'); d.setFontSize(11); d.text('Step-by-step calculation',8,12);
+  d.autoTable({...base,startY:15,margin:{left:8,right:8},head:[['Step','Item','Working','Result']],body:M.steps.map(s=>[String(s.n),pdfText(s.title),pdfText(s.formula+(s.note?'  ['+s.note+']':'')),pdfText(s.result)]),
+    columnStyles:{0:{cellWidth:9,halign:'center'},1:{cellWidth:40,fontStyle:'bold'},3:{cellWidth:55,fontStyle:'bold'}},styles:{...base.styles,fontSize:6.8}});
+  y=d.lastAutoTable.finalY+3; if(y>150){ d.addPage(); y=12; }
+  d.autoTable({...base,startY:y,margin:{left:8,right:200},head:[['Step','Width, mm','Stack, mm','Net mm2']],body:M.coreSteps});
+  d.autoTable({...base,startY:y,margin:{left:102,right:120},head:[['Tap','Setting','HV volts','Turns']],body:P(M.taps)});
+  d.autoTable({...base,startY:y,margin:{left:182,right:8},head:[['Clearances','']],body:P(M.clr)});
+  const n=d.getNumberOfPages(); for(let i=2;i<=n;i++){ d.setPage(i); d.setFontSize(6); d.setTextColor(90); d.text('Page '+i+' of '+n,8,205); }
+  saveFile(fname('pdf'),d.output('blob'));
+});
+$('#dlXlsx').addEventListener('click',()=>{
+  if(!CUR) return; if(!window.XLSX){ toast('Excel library did not load. Check your connection and reload.'); return; }
+  const M=CUR.M, wb=XLSX.utils.book_new();
+  const a=[[M.title.title],[],...M.title.cells,[],['WINDING DATA','LV (inner)','HV (outer)'],...M.wind,[],['CORE DATA'],...M.core,[],['PERFORMANCE'],...M.perf,[],['CLEARANCES'],...M.clr,[],['DIMENSIONS AND BILL OF MASS'],...M.wts];
+  const ws=XLSX.utils.aoa_to_sheet(a); ws['!cols']=[{wch:34},{wch:30},{wch:40}]; XLSX.utils.book_append_sheet(wb,ws,'Design sheet');
+  const ws2=XLSX.utils.aoa_to_sheet([['Step','Item','Working','Result','Note'],...M.steps.map(s=>[s.n,s.title,s.formula,s.result,s.note||''])]); ws2['!cols']=[{wch:6},{wch:30},{wch:90},{wch:40},{wch:40}]; XLSX.utils.book_append_sheet(wb,ws2,'Step-by-step');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Step','Width mm','Stack mm','Net area mm2'],...M.coreSteps]),'Core steps');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Tap','Setting','HV volts','Turns'],...M.taps]),'Taps');
+  const out=XLSX.write(wb,{bookType:'xlsx',type:'array'}); saveFile(fname('xlsx'),new Blob([out]));
+});
+loadPreset('p500');
+</script>
+<script>
+// ================= Rectangular-core module UI =================
+const rform=$('#rf');
+const REQ_DEFAULT=[
+ ['kva','kVA Rating','70 kVA'],['phase','Phase & Input Frequency','3 & 50Hz'],['app','Type of application','Linear loads'],
+ ['pri','Primary Voltage','433 V, 3-Phase, 3-Wire, No Taps'],['sec','Secondary Voltage','400 V, 3-Phase, 4-Wire, Star (Y)'],['vg','Vector Group','Dyn11'],
+ ['eff','Efficiency @ 115 deg c & 100% load','> 97%'],['imp','% Impedance @ 115 deg c','3.0% (+0% / −10%)'],['ins','Insulation class','Class H, 180 deg c'],
+ ['rise','Temperature rise at rated load by change of dcr method','Within 115˚C @ ambient temperature of 50°C'],['cool','Cooling','Natural cooled'],
+ ['mat','Winding material','Aluminium'],['core','Grade of core material','CRGO M4 or better'],['std','Design standard','IEC 60076-11 / IS 2026'],
+ ['pt100','Thermal sensing','PT100 in inner wdg of all coils'],['term','Termination','Aluminium bus bar dia 11 hole'],['earth','Earthing','M10 bolt welded to bottom frame'],
+ ['mech','Mechanical dimension (WxDxH) in mm','Vendor to specify.'],['mount','Mounting dimensions (WxD) in mm','Vendor to specify, Mounting hole:- dia 13 holes'],
+ ['wt','Weight','Vendor to specify.'],['shield','Shield','Vendor to specify based on design requirement.'],['ir','Insulation resistance','>100Mohm @ 500VDC'],
+ ['hv','Dielectric withstand (wdg-wdg, wdg-earth)','3kVAC'],['noise','Noise level','50dB max @ 4ft distance'],['encl','Enclosure','Not required.'],
+ ['clh','Active parts will be insulated with class-H insulation materials.','Yes.'],['paint','All Yoke surfaces are painted with High temperature paint.','Yes.'],
+ ['inst','Installation Type','Outdoor within container.'],
+ ['test','FAT: IR Test before HV','Yes'],['test','FAT: HV test','Yes'],['test','FAT: IR Test after HV','Yes'],['test','FAT: Winding resistance test','Yes'],
+ ['test','FAT: No Load test','Yes (V, A, Wo, vector group, magnetic balance)'],['test','FAT: Short circuit test','Yes (impedance, loss)'],['test','FAT: Dimensional and visual checks','Yes (overall and mounting)']];
+let REQ=REQ_DEFAULT.map(r=>r.slice()); let REQ_NAME='TRX 70 kVA, 433 V / 400 V, Al, Dyn11 (built in)';
+const RBASE={kVA:70,freq:50,priV:433,secV:400,vg:'Dyn11',mat:'Al',zTarget:3,zTolPlus:0,zTolMinus:10,effMin:97,riseLimit:115,amb:50,windTemp:115,insClass:'H',grade:'M4-27',noiseMax:50,enclosure:'0',
+  basis:'sheet',B:1.4,lvType:'strip',hvType:'strip',gap:12,delta:12,am:15,plateD:4,lvEnd:40,hvEndMin:40,ductW:8,ins:0.11,il:0.13,bulge:1.1,tankWkVA:1.5,extraTurn:1,roundLen:'0',coreFactor:1.32,buildF:1.5,clrL:250,clrB:260,
+  pCore:270,pCond:440,pSteel:200,pFg:500,pClh:5950,pResin:650,pOthers:15,party:'Delta Electronics India',wo:'',sheetNo:'',by:'Meghana N T',appr:'Geetha B'};
+const RPRESETS={
+  sheet70:{...RBASE,roundLen:'1',K:79,W:80,D:'',lvLayers:4,hvLayers:4,lvB:10.5,lvH:3.5,lvRad:1,lvAx:2,hvB:10.5,hvH:3.5,hvRad:1,hvAx:1,lvDucts:0,hvDucts:0},
+  auto70:{...RBASE,basis:'refined',K:'',W:'',D:'',lvLayers:'',hvLayers:'',lvB:'',lvH:'',lvRad:'',lvAx:'',hvB:'',hvH:'',hvRad:'',hvAx:'',lvDucts:'',hvDucts:'',J1:'',J2:''}};
+function rLoad(p){ for(const el of rform.elements){ if(!el.name) continue; const v=p[el.name]; el.value=(v===undefined||v===null)?'':v; } rRun(); }
+function rNum(n){ const el=rform.elements[n]; if(!el) return null; const s=String(el.value).trim(); return s===''?null:parseFloat(s); }
+function rStr(n){ return rform.elements[n]?rform.elements[n].value:''; }
+function rInputs(){
+  const vg=rStr('vg'); const priConn=vg[0]==='D'?'D':'Y'; const sc=vg.slice(1).replace(/n/g,''); const secConn=/^d/i.test(sc)?'D':(/^z/i.test(sc)?'Y':'Y');
+  const mat=rStr('mat'); const n=rNum;
+  const cond=(pre)=>{ const t=rStr(pre+'Type'), b=n(pre+'B'), h=t==='round'?b:n(pre+'H'), rad=n(pre+'Rad')||1, ax=n(pre+'Ax')||1; return (b&&h)?{type:t,b,h,rad,ax}:null; };
+  const c1=cond('lv'), c2=cond('hv');
+  const p={...RC_DEFAULTS,kVA:n('kVA'),freq:n('freq'),priV:n('priV'),priConn,secV:n('secV'),secConn,vg,mat,grade:rStr('grade'),insClass:rStr('insClass'),
+    zTarget:n('zTarget'),zTolPlus:n('zTolPlus')??0,zTolMinus:n('zTolMinus')??10,effMin:n('effMin')??97,riseLimit:n('riseLimit')??115,amb:n('amb')??50,windTemp:n('windTemp')??115,noiseMax:n('noiseMax')??50,
+    basis:rStr('basis'),K:n('K'),B:n('B')??1.4,W:n('W'),D:n('D'),lvLayers:n('lvLayers'),hvLayers:n('hvLayers'),N1:n('N1'),N2:n('N2'),J1:n('J1'),J2:n('J2'),
+    gap:n('gap')??12,delta:n('delta')??12,am:n('am')??15,plateD:n('plateD')??4,lvEnd:n('lvEnd')??40,hvEndMin:n('hvEndMin')??40,lvDucts:n('lvDucts'),hvDucts:n('hvDucts'),
+    lvDuctW:n('ductW')??8,hvDuctW:n('ductW')??8,lvIns:n('ins')??0.11,hvIns:n('ins')??0.11,lvIL:n('il')??0.13,hvIL:n('il')??0.13,bulge:n('bulge')??1.1,
+    tankWkVA:n('tankWkVA')??1.5,extraTurn:n('extraTurn')??1,roundLen:rStr('roundLen')==='1',coreFactor:n('coreFactor')??1.32,buildF:n('buildF')??1.5,clrL:n('clrL')??250,clrB:n('clrB')??260,enclosure:rStr('enclosure')==='1',
+    price:{core:n('pCore')??270,coreSteel:n('pSteel')??200,cond:n('pCond')??440,leads:n('pCond')??440,fg:n('pFg')??500,connFg:n('pFg')??500,clh:n('pClh')??5950,resin:n('pResin')??650,crca:90,others:n('pOthers')??15},
+    lvCond:c1,hvCond:c2,lvCondFixed:c1&&n('lvLayers')?c1:null,hvCondFixed:c2&&n('hvLayers')?c2:null};
+  const manual=p.K&&p.W&&p.lvLayers&&p.hvLayers&&c1&&c2&&p.lvDucts!=null&&p.hvDucts!=null;
+  const meta={party:rStr('party'),wo:rStr('wo'),sheetNo:rStr('sheetNo'),by:rStr('by'),appr:rStr('appr')};
+  return {p,manual,meta};
+}
+let RCUR=null, rTimer;
+rform.addEventListener('input',()=>{ clearTimeout(rTimer); rTimer=setTimeout(rRun,450); });
+rform.addEventListener('change',e=>{ if(e.target.name==='mat'){ rform.pCond.value=e.target.value==='Cu'?900:440; } clearTimeout(rTimer); rTimer=setTimeout(rRun,60); });
+function rRun(){
+  const {p,manual,meta}=rInputs(); if(!p.kVA||!p.priV||!p.secV||!p.zTarget) return;
+  $('#rAutoNote').textContent='Designing…';
+  setTimeout(()=>{ try{
+    const t0=performance.now(); let o=manual?rectDesign(p):rectAuto(p);
+    if(!o){ $('#rWarns').classList.add('on'); $('#rWarns ul').innerHTML='<li>No winding arrangement fits these fixed values. Clear one of the design fields so it can be chosen automatically.</li>'; $('#rAutoNote').textContent=''; return; }
+    const ms=Math.round(performance.now()-t0);
+    $('#rAutoNote').textContent=manual?'All design values are fixed, so this is a direct calculation of your sheet.':'Blank design values were chosen automatically: '+(o.searched||0).toLocaleString('en-IN')+' designs checked in '+ms+' ms, cheapest one that meets the requirement kept.';
+    $('#rFix').hidden=manual;
+    const M=rModel(o,meta); RCUR={o,M,meta}; rRender(o,M);
+  }catch(e){ console.error(e); $('#rWarns').classList.add('on'); $('#rWarns ul').innerHTML='<li>These inputs cannot be designed: '+esc(e.message)+'.</li>'; } },20);
+}
+$('#rFix').addEventListener('click',()=>{ if(!RCUR) return; const o=RCUR.o, q=o.p; const set=(k,v)=>{ if(rform.elements[k]) rform.elements[k].value=v; };
+  set('K',q.K); set('W',o.W); set('lvLayers',o.L1); set('hvLayers',o.L2); set('lvDucts',q.lvDucts); set('hvDucts',q.hvDucts);
+  for(const [pre,C] of [['lv',o.C1],['hv',o.C2]]){ set(pre+'Type',C.type); set(pre+'B',C.b); set(pre+'H',C.type==='round'?'':C.h); set(pre+'Rad',C.rad); set(pre+'Ax',C.ax); }
+  toast('Automatic values copied. Edit any of them to fine-tune.'); rRun(); });
+const g=(x,n=2)=>(x==null||isNaN(x))?'–':Number(x).toFixed(n);
+function condTxt(C,ins){ return C.type==='round'?'Ø '+g(C.b,2):g(C.b,2)+' × '+g(C.h,2); }
+function condTxtI(C){ return C.type==='round'?'Ø '+g(C.bi,2):g(C.bi,2)+' × '+g(C.hi,2); }
+function rModel(o,m){
+  const p=o.p, W1=o.W1, W2=o.W2, T=p.windTemp, mat=RC.COND[p.mat].name;
+  const cn=c=>c==='D'?'Delta':'Star';
+  const date=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+  const title={title:'Electrical design calculations — rect core type, '+p.kVA+' kVA '+p.priV+' / '+p.secV+' V, '+p.vg,
+    cells:[['Party',m.party||'—'],['Work order',m.wo||'—'],['Calc. sheet no.',m.sheetNo||'—'],['Date',date],
+      ['kVA / phase',p.kVA+' kVA, 3 phase'],['Connection',p.vg],['Cooling','AN, class '+p.insClass],['Frequency',p.freq+' Hz'],
+      ['Frame W / D / limb H / C.dist',o.W+' / '+o.D+' / '+g(o.limb,2)+' / '+g(o.Cd,0)],['K / V per turn',p.K+' / '+g(o.Vt,4)],['Wind. temp / ambient',T+' °C / '+p.amb+' °C'],['Standards','IS 2026 / IS 11171, IEC 60076-11'],
+      ['ek % calc / guaranteed',g(o.ek,2)+' / '+p.zTarget],['Calculation basis',p.basis==='sheet'?'As per design sheet':'Refined'],['Designed',m.by||'—'],['Approved',m.appr||'—']]};
+  const wind=[['Winding',W1.role+' (inner)',W2.role+' (outer)'],
+    ['Connection',cn(W1.conn),cn(W2.conn)],['Line voltage, V',String(W1.V),String(W2.V)],['Rated voltage / phase, V',g(W1.Vph,2),g(W2.Vph,2)],['Rated current / phase, A',g(W1.Iph,3),g(W2.Iph,3)],
+    ['Conductor',mat+' '+o.C1.type,mat+' '+o.C2.type],['Wire bare, mm',condTxt(o.C1),condTxt(o.C2)],['Wire insulated, mm',condTxtI(o.C1),condTxtI(o.C2)],['Insulation, mm',g(p.lvIns,2),g(p.hvIns,2)],
+    ['No. in parallel R × A',o.C1.rad+' × '+o.C1.ax,o.C2.rad+' × '+o.C2.ax],['Cross section, mm²',g(o.C1.cs,2),g(o.C2.cs,2)],['Current density, A/mm²',g(o.J1,3),g(o.J2,3)],
+    ['Turns / limb',String(o.N1),String(o.N2)],['Layers',String(o.L1),String(o.L2)],['Turns / layer',g(o.tpl1,2),g(o.tpl2,2)],['Insulation b/w layers, mm',g(p.lvIL,2),g(p.hvIL,2)],
+    ['Radial ducts',p.lvDucts+' × '+p.lvDuctW+' mm',p.hvDucts+' × '+p.hvDuctW+' mm'],['Wind length (axial), mm',g(o.len1,2),g(o.len2,2)],['Winding length for impedance, mm',g(o.imp1,2),g(o.imp2,2)],
+    ['End clearances, mm',g(o.end1,0),g(o.end2,0)],['Limb length, mm',g(o.limb,2),g(o.limb,2)],['Winding radial depth, mm',g(o.rad1,1),g(o.rad2,1)],['Turn length, m',g(o.m1/1000,4),g(o.m2/1000,4)],
+    ['Wire length / phase, m',g(o.wire1,2),g(o.wire2,2)],['Resistance / phase @'+T+' °C, Ω',g(o.Rw1,6),g(o.Rw2,6)],['Conductor bare / insulated, kg',g(o.bare1,2)+' / '+g(o.ins1,2),g(o.bare2,2)+' / '+g(o.ins2,2)],
+    ['Stray losses, %',g(o.st1,3),g(o.st2,3)],['Load loss @'+T+' °C, W',g(o.LL1,1),g(o.LL2,1)],['Surface area / limb, m²',g(o.S1,4),g(o.S2,4)],['Loading, W/m²',g(o.q1,1),g(o.q2,1)],
+    ['Winding temp. rise, K',g(o.rise1,1),g(o.rise2,1)],['Halacsy cross-check, K',g(o.hal1,1),g(o.hal2,1)]];
+  const build=[['Core W × D (with limb plate)',o.W+' × '+o.D+' ('+o.cW+' × '+o.cD+') mm'],['Bobbin gap / δ / am',p.gap+' / '+p.delta+' / '+p.am+' mm'],
+    ['Inner ID / OD (W × D)',g(o.ID1w,1)+' × '+g(o.ID1d,1)+' / '+g(o.OD1w,1)+' × '+g(o.OD1d,1)],['Outer ID / OD (W × D)',g(o.ID2w,1)+' × '+g(o.ID2d,1)+' / '+g(o.OD2w,1)+' × '+g(o.OD2d,1)],
+    ['Centre distance / yoke length',g(o.Cd,1)+' / '+g(o.yokeL,1)+' mm'],['Window width × height',g(o.winW,1)+' × '+g(o.limb,2)+' mm'],['Corner radii R1–R4',o.R.map(x=>g(x,1)).join(' / ')+' mm'],
+    ['Perimeters P1–P4',o.P.join(' / ')+' mm'],['Mean length inner / gap / outer',g(o.m1,1)+' / '+g(o.mg,1)+' / '+g(o.m2,1)+' mm']];
+  const core=[['Net cross section',g(o.Anet,2)+' cm²'],['Stacking factor',String(o.sf)],['Flux density',g(o.Bact,3)+' T'],['Steel grade',p.grade],['Core mass',g(o.coreMass,2)+' kg'],
+    ['Specific loss × factor',g(o.spec,3)+' × '+p.coreFactor+' = '+g(o.spec*p.coreFactor,3)+' W/kg'],['Building factor',String(p.buildF)],['Core loss',g(o.NLL,1)+' W'],
+    ['VA/kg / gap VA/cm²',g(o.vakg,3)+' / '+g(o.vacm,3)],['Σ VA (limb, yoke, corner, gap)',g(o.VA,1)+' VA'],['No-load current',g(o.I0,3)+' %'],['Extra no-load loss',g(o.extraNL,3)+' W']];
+  const imp=[['h (mean wdg length)',g(o.h,2)+' mm'],['b (radial span)',g(o.bb,2)+' mm'],['k_r',g(o.kr,4)],['Ls',g(o.Ls,2)+' mm'],['δ′',g(o.dP,2)+' mm²'],
+    ['Er',g(o.er,3)+' %'],['Ex',g(o.ex,3)+' %'],['Ek',g(o.ek,3)+' % (limits '+g(o.zLo,2)+'–'+g(o.zHi,2)+')']];
+  const loss=[['Inner winding',g(o.LL1,1)+' W'],['Outer winding',g(o.LL2,1)+' W'],['Tank / stray (W/kVA × kVA)',g(o.tank,0)+' W'],['Total load loss',g(o.LL,1)+' W'],['Core loss',g(o.NLL,1)+' W'],
+    ['Total loss',g(o.LL+o.NLL,1)+' W'],['Efficiency 100 % / 50 %, pf 1',g(o.eff,2)+' / '+g(o.eff50,2)+' %'],['McLyman overall rise',g(o.mcly,1)+' K']];
+  const mech=[['Active part L × B × H',o.aL+' × '+o.aB+' × '+o.aH+' mm'],['Overall L × B × H',o.oL+' × '+o.oB+' × '+o.oH+' mm'],['Core and winding mass',o.coreWdg+' kg'],['Total mass (without enclosure)',g(o.totMass-(o.bom.find(b=>b.k==='CRCA enclosure')||{q:0}).q,1)+' kg'],['Total mass',g(o.totMass,1)+' kg']];
+  const bom=o.bom.map((b,i)=>[String(i+1),b.k,g(b.q,2),b.pr?String(b.pr):'—',b.amt?f0(b.amt):'—']);
+  bom.push(['','Sub-total','','',f0(o.matCost)],['','Others @ '+p.price.others+' %','','',f0(o.others)],['','RM price','','',f0(o.cost)]);
+  const comp=compRows(o);
+  return {title,wind,build,core,imp,loss,mech,bom,comp,steps:rSteps(o),checks:o.checks,warn:o.warn};
+}
+function reqKey(t){ t=t.toLowerCase();
+  const K=[['kva','kva'],['phase','phase'],['applicat','app'],['primary','pri'],['secondary','sec'],['vector','vg'],['efficien','eff'],['impedance','imp'],['resistance','ir'],['insulation class','ins'],
+    ['temperature rise','rise'],['cooling','cool'],['winding material','mat'],['core','core'],['standard','std'],['thermal','pt100'],['terminat','term'],['earthing','earth'],['mechanical','mech'],['mounting','mount'],
+    ['weight','wt'],['shield','shield'],['dielectric','hv'],['noise','noise'],['enclosure','encl'],['class-h','clh'],['class h insul','clh'],['paint','paint'],['installation','inst'],['test','test'],['check','test']];
+  for(const [k,v] of K) if(t.includes(k)) return v; return 'other'; }
+function compRows(o){
+  const p=o.p; const ck=n=>o.checks.find(c=>c.name.startsWith(n));
+  const offer={kva:[p.kVA+' kVA',true],phase:['3 phase, '+p.freq+' Hz',true],app:['Designed for linear loads',true],
+    pri:[p.priV+' V, '+(p.priConn==='D'?'delta, 3-wire':'star')+', no taps',true],sec:[p.secV+' V, '+(p.secConn==='Y'?'star (Y), 4-wire, neutral brought out':'delta'),true],vg:[p.vg,true],
+    eff:[g(o.eff,2)+' % @'+p.windTemp+' °C, 100 % load',ck('Efficiency').ok],imp:[g(o.ek,2)+' % @'+p.windTemp+' °C',ck('Impedance').ok],ins:['Class '+p.insClass+' materials',true],
+    rise:['Inner '+g(o.rise1,1)+' K, outer '+g(o.rise2,1)+' K at '+p.amb+' °C ambient',ck('Winding temperature').ok],cool:['AN, natural air cooled',true],mat:[RC.COND[p.mat].name.toLowerCase().replace(/^./,c=>c.toUpperCase())+' strip / wire',true],
+    core:['CRGO '+p.grade+', '+g(o.Bact,3)+' T',true],std:['IS 2026 / IS 11171 / IEC 60076-11',true],pt100:['PT100 in inner winding of each limb',true],term:['As specified',true],earth:['As specified',true],
+    mech:['Active part '+o.aL+' × '+o.aB+' × '+o.aH+' (overall '+o.oL+' × '+o.oB+' × '+o.oH+')',true],mount:['Frame footprint '+o.aL+' × '+o.aB+', Ø13 holes',true],
+    wt:[g(o.totMass,0)+' kg',true],shield:['Not required for linear loads; electrostatic shield optional',true],ir:['> 100 MΩ @ 500 V DC, verified at FAT',true],
+    hv:['3 kV AC, 1 min (Um 1.1 kV)',true],noise:[ck('Noise').got,ck('Noise').ok],encl:[p.enclosure?'CRCA enclosure supplied':'Not supplied',true],clh:['Yes',true],paint:['Yes',true],
+    inst:['Suitable for outdoor use within container',true],test:['Will be carried out',true],other:['Noted',true]};
+  const numEq=(spec,val)=>{ const m=String(spec).match(/([\d.]+)/); return !m||Math.abs(parseFloat(m[1])-val)<0.01; };
+  const vgEq=(spec)=>{ const s=String(spec).replace(/\s/g,'').toLowerCase(); return !s||s.includes(p.vg.toLowerCase()); };
+  return REQ.map(([k,param,spec],i)=>{ const key=k||reqKey(param); let [v,ok]=offer[key]||offer.other;
+    if(key==='kva') ok=numEq(spec,p.kVA); if(key==='pri') ok=numEq(spec,p.priV); if(key==='sec') ok=numEq(spec,p.secV); if(key==='vg') ok=vgEq(spec);
+    if(key==='mat') ok=!/alu|copp/i.test(spec)||(/alu/i.test(spec)===(p.mat==='Al'));
+    return [String(i+1),param,spec,v,ok?'Complies':'Check']; });
+}
+function rSteps(o){
+  const p=o.p,W1=o.W1,W2=o.W2,T=p.windTemp; const s=[]; const S=(t,f,r)=>s.push([t,f,r]);
+  S('Volts per turn','V/t = 1.01 × √(kVA/3) × K/100 = 1.01 × √('+p.kVA+'/3) × '+p.K+'/100',g(o.Vt0,4)+' V');
+  S('Phase voltages',W1.role+' '+(W1.conn==='Y'?'star: V/√3':'delta: V')+'; '+W2.role+' '+(W2.conn==='Y'?'star: V/√3':'delta: V'),g(W1.Vph,2)+' / '+g(W2.Vph,2)+' V');
+  S('Phase currents','I = kVA × 1000 ÷ (√3 V_L) for star, ÷ (3 V_L) for delta',g(W1.Iph,3)+' / '+g(W2.Iph,3)+' A');
+  S('Turns per limb','N = round(V_ph ÷ V/t)',o.N1+' / '+o.N2);
+  S('Turns-ratio error','(V ratio − N ratio) ÷ V ratio × 100',g(o.rerr,3)+' %');
+  S('Net core area','A = V/t ÷ (4.44 × f × B × 10⁻⁴) = '+g(o.Vt,4)+' ÷ (4.44 × '+p.freq+' × '+p.B+' × 10⁻⁴)',g(o.Areq,2)+' cm²');
+  S('Core build D','D = round(A ÷ stacking ÷ (W × 0.1) × 10) with W = '+o.W,o.D+' mm, B = '+g(o.Bact,3)+' T');
+  S('Conductor section','{(b × h) − corner} × R × A; corner from strip height table',g(o.C1.cs,2)+' / '+g(o.C2.cs,2)+' mm²');
+  S('Current density','I ÷ section',g(o.J1,3)+' / '+g(o.J2,3)+' A/mm²');
+  S('Turns per layer','N ÷ layers = '+o.N1+' ÷ '+o.L1+', '+o.N2+' ÷ '+o.L2,g(o.tpl1,2)+' / '+g(o.tpl2,2));
+  const et=p.extraTurn==null?1:p.extraTurn;
+  const axw=(C,tpl,extra,len)=>{ const raw=C.bi*C.ax*(tpl+et)+extra;
+    return g(C.bi,2)+' × '+C.ax+' × ('+g(tpl,2)+' + '+et+')'+(extra?' + '+g(extra,1):'')+' = '+g(raw,2)+(p.roundLen?' → '+len+' (rounded)':''); };
+  S('Axial winding length','b_i × axial parallels × (turns/layer + '+et+' for the layer crossover) + transposition + ducts. Inner: '+axw(o.C1,o.tpl1,p.lvTransp+p.lvComp+p.lvAxDucts,o.len1)+'; Outer: '+axw(o.C2,o.tpl2,p.hvTransp+p.hvComp+p.hvAxDucts,o.len2),g(o.len1,2)+' / '+g(o.len2,2)+' mm');
+  S('Limb length','inner length + '+p.lvEnd+' end clearance (outer end clearance = limb − outer length)',g(o.limb,2)+' mm, outer ends '+g(o.end2,2)+' mm');
+  S('Radial depth','(h_i × R × layers + ducts × width + insulation × (layers − 1)) × '+p.bulge+', rounded to 0.5 mm',g(o.rad1,1)+' / '+g(o.rad2,1)+' mm');
+  S('Build-up','ID = core + bobbin gap; OD = ID + 2 × radial; outer ID = inner OD + δ','inner '+g(o.OD1w,1)+' × '+g(o.OD1d,1)+', outer '+g(o.OD2w,1)+' × '+g(o.OD2d,1)+' mm');
+  S('Centre distance, yoke','C = outer OD (W) + am; yoke = 2C + W',g(o.Cd,1)+' / '+g(o.yokeL,1)+' mm');
+  S('Mean turn lengths','P = 2W + 2D + 2πR with R1…R4 = '+o.R.map(x=>g(x,1)).join(', '),g(o.m1,1)+' / '+g(o.m2,1)+' mm');
+  S('Resistance','R = wire length ÷ (section × σ'+T+'), σ = '+g(o.sig,3)+' m/Ω·mm²',g(o.Rw1,6)+' / '+g(o.Rw2,6)+' Ω');
+  S('Conductor mass','length × section × density × 3; insulated adds covering at density 2',g(o.ins1,2)+' / '+g(o.ins2,2)+' kg');
+  S('Stray loss','[(h/10) × √(fill) × '+RC.COND[p.mat].sf+']⁴ × (layers × R)² ÷ 9 × 100',g(o.st1,3)+' / '+g(o.st2,3)+' %');
+  S('Load loss','3 × I² × R × (1 + stray) per winding, plus '+p.tankWkVA+' W/kVA stray',g(o.LL1,1)+' + '+g(o.LL2,1)+' + '+o.tank+' = '+g(o.LL,1)+' W');
+  S('Resistive voltage','Er = load loss ÷ (kVA × 10)',g(o.er,3)+' %');
+  S('Reactance geometry','h = '+g(o.h,2)+', b = '+g(o.bb,2)+', k_r = 1 − 1/(π h/b) = '+g(o.kr,4)+', Ls = h/k_r','Ls '+g(o.Ls,2)+' mm, δ′ '+g(o.dP,1)+' mm²');
+  S('Reactive voltage','Ex = 8π² f I N δ′ × 10⁻⁸ ÷ (Ls × V/t)',g(o.ex,3)+' %');
+  S('Impedance','Ek = √(Er² + Ex²)',g(o.ek,3)+' %');
+  S('Core mass','(3 × limb + 2 × yoke) × 0.1 × A × 7.65 × 10⁻³',g(o.coreMass,2)+' kg');
+  S('Core loss','mass × specific loss × '+p.coreFactor+' × building factor '+p.buildF,g(o.NLL,1)+' W');
+  S('No-load current','Σ VA = limb + yoke + 6 × corner VA/kg + 6 × gap VA/cm²',g(o.VA,1)+' VA = '+g(o.I0,3)+' %');
+  S('Winding loading','load loss ÷ (3 × turn length × winding length × (2 + 2 × ducts))',g(o.q1,1)+' / '+g(o.q2,1)+' W/m²');
+  S('Temperature rise','inner 15 + W/m² ÷ 5; outer 15 + W/m² ÷ 7',g(o.rise1,1)+' / '+g(o.rise2,1)+' K');
+  S('McLyman check','Θ = 450 × (Σ loss ÷ Σ surface cm²)^0.826',g(o.mcly,1)+' K');
+  S('Efficiency','kVA ÷ (kVA + core loss + load loss)',g(o.eff,2)+' %');
+  S('Dimensions','active: L = 2C + (outer OD − W), B = outer OD (D), H = 2W + limb + 5; overall adds '+p.clrL+' / '+p.clrB+' / 325',o.aL+' × '+o.aB+' × '+o.aH+'; '+o.oL+' × '+o.oB+' × '+o.oH+' mm');
+  S('Mass and cost','BOM ratios from the design sheet, prices ₹/kg',g(o.totMass,1)+' kg, ₹ '+f0(o.cost));
+  return s;
+}
+function rRender(o,M){
+  const p=o.p; const k=[['Impedance',g(o.ek,2),'%',!o.checks[0].ok],['Efficiency',g(o.eff,2),'%',!o.checks[1].ok],['Rise inner / outer',g(o.rise1,0)+' / '+g(o.rise2,0),'K',!o.checks[2].ok],
+    ['Core W × D',o.W+' × '+o.D,'mm'],['Core loss',f0(o.NLL),'W'],['Load loss',f0(o.LL),'W'],['Total mass',f0(o.totMass),'kg'],['RM price','₹ '+f0(o.cost),'']];
+  $('#rKpis').innerHTML=k.map(x=>'<div class="kpi'+(x[3]?' bad':'')+'"><span>'+x[0]+'</span><strong>'+x[1]+'</strong><em>'+x[2]+'</em></div>').join('');
+  const w=$('#rWarns'); w.classList.toggle('on',o.warn.length>0); $('ul',w).innerHTML=o.warn.map(x=>'<li>'+esc(x)+'</li>').join(''); $('#rOk').classList.toggle('on',o.warn.length===0);
+  const t=M.title;
+  $('#rSheet').innerHTML='<div class="titleblock"><div class="big">'+esc(t.title)+'</div>'+t.cells.map(c=>'<div><span>'+c[0]+'</span>'+esc(c[1])+'</div>').join('')+'</div>'+
+    '<div class="cols"><div><h3>Winding data</h3>'+tbl(M.wind.slice(1),['Parameter',M.wind[0][1],M.wind[0][2]])+'<h3>Core and coil build-up</h3>'+tbl(M.build)+'</div><div>'+
+    '<h3>Core</h3>'+tbl(M.core)+'<h3>Impedance voltage</h3>'+tbl(M.imp)+'<h3>Losses and efficiency</h3>'+tbl(M.loss)+'<h3>Mechanical details</h3>'+tbl(M.mech)+
+    '<h3>Bill of materials</h3><table><tr><th>#</th><th>Item</th><th>kg</th><th>₹/kg</th><th>₹</th></tr>'+M.bom.map(r=>'<tr>'+r.map((c,i)=>'<td'+(i>=2?' class="n"':'')+'>'+esc(c)+'</td>').join('')+'</tr>').join('')+'</table></div></div>';
+  $('#rComp').innerHTML='<h3>Compliance with '+esc(REQ_NAME)+'</h3><table><tr><th>#</th><th>Parameter</th><th>Specification</th><th>Offered / design value</th><th>Status</th></tr>'+
+    M.comp.map(r=>'<tr><td>'+r[0]+'</td><td>'+esc(r[1])+'</td><td>'+esc(r[2])+'</td><td>'+esc(r[3])+'</td><td style="font-weight:600;color:'+(r[4]==='Complies'?'#2E7D4F':'#B23A2E')+'">'+r[4]+'</td></tr>').join('')+'</table>'+
+    '<h3>Design checks</h3><table><tr><th>Check</th><th>Requirement</th><th>Obtained</th><th>Result</th></tr>'+o.checks.map(c=>'<tr><td>'+esc(c.name)+'</td><td>'+esc(c.req)+'</td><td>'+esc(c.got)+'</td><td style="font-weight:600;color:'+(c.ok?'#2E7D4F':'#B23A2E')+'">'+(c.ok?'Pass':'Fail')+'</td></tr>').join('')+'</table>';
+  $('#rSteps').innerHTML='<table><tr><th>#</th><th>Item</th><th>Working</th><th>Result</th></tr>'+M.steps.map((s,i)=>'<tr><td>'+(i+1)+'</td><td>'+esc(s[0])+'</td><td class="formula">'+esc(s[1])+'</td><td class="r">'+esc(s[2])+'</td></tr>').join('')+'</table>';
+  rSVG(o);
+}
+function rSVG(o){
+  const W=o.W, L=o.limb, Cd=o.Cd, Y=W; const FW=2*Cd+W, FH=L+2*Y; const gapX=120; const planW=o.OD2w+20, planH=o.OD2d+20;
+  const pad=Math.max(30,(o.OD2w-W)/2+20), vbW=FW+gapX+planW+2*pad, vbH=Math.max(FH,planH)+2*pad+30; const fs=Math.max(12,vbW/70);
+  const x0=pad, y0=pad+20;
+  let s='<svg viewBox="0 0 '+vbW+' '+vbH+'" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Front view of core and coils and plan view of one limb" font-family="Barlow, Arial" font-size="'+fs+'" style="color:var(--ink)">';
+  s+='<rect x="'+x0+'" y="'+y0+'" width="'+FW+'" height="'+FH+'" fill="#A3ADB6"/>';
+  for(let i=0;i<2;i++){ s+='<rect x="'+(x0+W+i*Cd)+'" y="'+(y0+Y)+'" width="'+(Cd-W)+'" height="'+L+'" fill="var(--panel)"/>'; }
+  for(let i=0;i<3;i++){ const cx=x0+W/2+i*Cd;
+    s+='<rect x="'+(cx-o.OD2w/2)+'" y="'+(y0+Y+(L-o.len2)/2)+'" width="'+o.OD2w+'" height="'+o.len2+'" fill="#9B4A26" opacity=".85" rx="4"/>';
+    s+='<rect x="'+(cx-o.ID2w/2)+'" y="'+(y0+Y+(L-o.len2)/2)+'" width="'+o.ID2w+'" height="'+o.len2+'" fill="var(--panel)"/>';
+    s+='<rect x="'+(cx-o.OD1w/2)+'" y="'+(y0+Y+(L-o.len1)/2)+'" width="'+o.OD1w+'" height="'+o.len1+'" fill="#C08A1E" opacity=".9" rx="3"/>';
+    s+='<rect x="'+(cx-o.ID1w/2)+'" y="'+(y0+Y+(L-o.len1)/2)+'" width="'+o.ID1w+'" height="'+o.len1+'" fill="var(--panel)"/>';
+    s+='<rect x="'+(cx-W/2)+'" y="'+(y0+Y)+'" width="'+W+'" height="'+L+'" fill="#A3ADB6"/>'; }
+  s+='<text x="'+(x0+FW/2)+'" y="'+(y0-8)+'" text-anchor="middle" fill="currentColor">Front view — yoke '+Math.round(o.yokeL)+', centres '+Math.round(Cd)+', limb '+g(L,2)+' mm</text>';
+  // plan view: rounded rectangles
+  const px=x0+FW+gapX+10, py=y0+(FH-planH)/2+10; const cx=px+o.OD2w/2, cy=py+o.OD2d/2;
+  const rr=(w,h,r,fill,op)=>'<rect x="'+(cx-w/2)+'" y="'+(cy-h/2)+'" width="'+w+'" height="'+h+'" rx="'+r+'" fill="'+fill+'"'+(op?' opacity="'+op+'"':'')+'/>';
+  s+=rr(o.OD2w,o.OD2d,o.R[3],'#9B4A26',.85)+rr(o.ID2w,o.ID2d,o.R[2],'var(--panel)')+rr(o.OD1w,o.OD1d,o.R[1],'#C08A1E',.9)+rr(o.ID1w,o.ID1d,o.R[0],'var(--panel)')+rr(o.cW,o.cD,0,'#7D8894');
+  s+='<text x="'+cx+'" y="'+(py-14)+'" text-anchor="middle" fill="currentColor">Plan — '+Math.round(o.OD2w)+' × '+Math.round(o.OD2d)+'</text>';
+  s+='<text x="'+cx+'" y="'+(cy+fs/3)+'" text-anchor="middle" fill="#fff" font-weight="600">'+o.W+'×'+o.D+'</text>';
+  s+='<text x="'+x0+'" y="'+(vbH-8)+'" fill="#A0741A" font-weight="600">■ '+o.W1.role+' (inner)</text><text x="'+(x0+fs*10)+'" y="'+(vbH-8)+'" fill="#9B4A26" font-weight="600">■ '+o.W2.role+' (outer)</text>';
+  s+='</svg>'; $('#rSvg').innerHTML=s;
+}
+// tabs
+$$('#rTabs button').forEach(b=>b.addEventListener('click',()=>{ $$('#rTabs button').forEach(x=>x.setAttribute('aria-selected',x===b)); for(const t of ['sheet','comp','steps']) $('#rtab-'+t).hidden=b.dataset.rtab!==t; }));
+$$('[data-rpreset]').forEach(b=>b.addEventListener('click',()=>rLoad(RPRESETS[b.dataset.rpreset])));
+// mode switch
+$$('[data-mode]').forEach(b=>b.addEventListener('click',()=>{ $$('[data-mode]').forEach(x=>x.setAttribute('aria-selected',x===b)); $('#layout-round').hidden=b.dataset.mode!=='round'; $('#layout-rect').hidden=b.dataset.mode!=='rect'; }));
+// requirement import
+$('#reqFile').addEventListener('change',async e=>{
+  const file=e.target.files[0]; if(!file) return; if(!window.XLSX){ toast('Spreadsheet library did not load. Reload the page.'); return; }
+  try{ const wb=XLSX.read(await file.arrayBuffer()); const ws=wb.Sheets[wb.SheetNames[0]]; const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+    const items=[]; let fat=false;
+    for(const r of rows){ const cells=r.map(c=>String(c).trim()).filter(c=>c!==''); if(!cells.length) continue;
+      if(/^s\.?\s*no/i.test(cells[0])) continue; if(/^fat/i.test(cells[0])&&cells.length===1){ fat=true; continue; }
+      const txt=cells.filter(c=>!/^\d+$/.test(c)); if(txt.length<2) continue; const param=txt[0], spec=txt[txt.length-1];
+      items.push([fat?'test':reqKey(param),(fat?'FAT: ':'')+param,spec]); }
+    if(!items.length) throw new Error('no parameter rows found');
+    const find=k=>(items.find(x=>x[0]===k)||[])[2]||''; const num=(s,re)=>{ const m=String(s).match(re||/([\d.]+)/); return m?parseFloat(m[1]):null; };
+    const set=(k,v)=>{ if(v!==null&&v!==undefined&&v!==''&&rform.elements[k]) rform.elements[k].value=v; };
+    set('kVA',num(find('kva'))); set('freq',num(find('phase'),/(\d+)\s*hz/i));
+    const pri=find('pri'), sec=find('sec'); set('priV',num(pri)); set('secV',num(sec));
+    const vg=find('vg').replace(/\s/g,''); if(vg){ const opt=[...rform.vg.options].find(o=>o.value.toLowerCase()===vg.toLowerCase()); if(opt) rform.vg.value=opt.value; }
+    set('effMin',num(find('eff'))); const effT=num(find('eff').replace(/.*@\s*/,''),/@?\s*(\d+)\s*deg/i);
+    const imp=find('imp'); set('zTarget',num(imp)); const tp=imp.match(/\+\s*([\d.]+)\s*%/), tm=imp.match(/[−-]\s*([\d.]+)\s*%/); if(tp) set('zTolPlus',parseFloat(tp[1])); if(tm) set('zTolMinus',parseFloat(tm[1]));
+    const it=REQ_DEFAULT; const ins=find('ins').match(/class\s*([A-Z])/i); if(ins) set('insClass',ins[1].toUpperCase());
+    const rise=find('rise'); set('riseLimit',num(rise,/(\d+)\s*[˚°]?\s*c/i)); const amb=rise.match(/ambient[^\d]*(\d+)/i); if(amb) set('amb',amb[1]);
+    const impT=(items.find(x=>x[0]==='imp')||['',''])[1].match(/@\s*(\d+)/); if(impT) set('windTemp',impT[1]);
+    const mat=find('mat'); if(/alu/i.test(mat)) set('mat','Al'); if(/copp/i.test(mat)) set('mat','Cu'); rform.pCond.value=rform.mat.value==='Cu'?900:440;
+    const core=find('core'); if(/moh/i.test(core)) set('grade','MOH-23'); else if(/crno/i.test(core)) set('grade','CRNO-35'); else if(/m4|crgo/i.test(core)) set('grade','M4-27');
+    set('noiseMax',num(find('noise'),/(\d+)\s*db/i)); const en=find('encl'); set('enclosure',/not/i.test(en)?'0':(en?'1':''));
+    REQ=items; REQ_NAME=file.name.replace(/\.[^.]+$/,'');
+    $('#reqStatus').textContent='Requirement imported: '+file.name+' ('+items.length+' rows). Design fields left as they were.';
+    toast('Requirement sheet imported'); rRun();
+  }catch(err){ console.error(err); toast('Could not read that sheet: '+err.message+'. Use a sheet with Parameter and Specification columns.'); }
+  e.target.value='';
+});
+// exports
+function rfname(ext){ const p=RCUR.o.p; return 'RectCore_'+p.kVA+'kVA_'+p.priV+'-'+p.secV+'V_'+p.mat+'_'+p.vg+'.'+ext; }
+$('#rPdf').addEventListener('click',()=>{
+  if(!RCUR) return; if(!window.jspdf){ toast('PDF library did not load. Reload the page.'); return; }
+  const {jsPDF}=window.jspdf; const d=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'}); const M=RCUR.M; const P=v=>v.map(r=>r.map(pdfText)); const ink=[23,33,43];
+  const base={theme:'grid',styles:{fontSize:6.8,cellPadding:0.8,lineColor:[150,160,170],lineWidth:0.15,textColor:ink},headStyles:{fillColor:[228,233,238],textColor:ink,fontStyle:'bold'},columnStyles:{0:{fontStyle:'bold'}}};
+  d.setDrawColor(...ink); d.setLineWidth(0.5); d.rect(8,8,281,24); d.setFont('helvetica','bold'); d.setFontSize(11); d.text(pdfText(M.title.title),10,13);
+  d.setFont('helvetica','normal'); d.setFontSize(6.4); M.title.cells.forEach((c,i)=>{ const x=10+(i%8)*35, y=18+Math.floor(i/8)*6.5; d.setTextColor(90); d.text(pdfText(c[0]),x,y); d.setTextColor(...ink); d.text(pdfText(c[1]).slice(0,34),x,y+2.7); });
+  d.autoTable({...base,startY:35,margin:{left:8,right:140},head:[P([['Parameter',M.wind[0][1],M.wind[0][2]]])[0]],body:P(M.wind.slice(1)),columnStyles:{0:{fontStyle:'bold',cellWidth:48}}});
+  let y=35; const R={...base,styles:{...base.styles,fontSize:6.4,cellPadding:0.6},margin:{left:161,right:8}}; const sec=(h,b)=>{ d.autoTable({...R,startY:y,head:[[h,'']],body:P(b),columnStyles:{0:{fontStyle:'bold',cellWidth:48}}}); y=d.lastAutoTable.finalY+1; };
+  sec('Core',M.core); sec('Impedance voltage',M.imp); sec('Losses and efficiency',M.loss); sec('Mechanical details',M.mech);
+  d.addPage(); d.setFont('helvetica','bold'); d.setFontSize(11); d.setTextColor(...ink); d.text(pdfText('Compliance with requirement — '+REQ_NAME),8,12);
+  d.autoTable({...base,startY:15,margin:{left:8,right:8},head:[['#','Parameter','Specification','Offered / design value','Status']],body:P(M.comp),
+    columnStyles:{0:{cellWidth:7},1:{cellWidth:70,fontStyle:'bold'},2:{cellWidth:70},4:{cellWidth:18,fontStyle:'bold'}},
+    didParseCell:(h)=>{ if(h.section==='body'&&h.column.index===4) h.cell.styles.textColor=h.cell.raw==='Complies'?[46,125,79]:[178,58,46]; }});
+  y=d.lastAutoTable.finalY+3; if(y>150){ d.addPage(); y=12; }
+  d.autoTable({...base,startY:y,margin:{left:8,right:150},head:[['Check','Requirement','Obtained','Result']],body:P(M.checks.map(c=>[c.name,c.req,c.got,c.ok?'Pass':'Fail']))});
+  const yb=d.lastAutoTable.finalY+3;
+  d.autoTable({...base,startY:yb,margin:{left:8,right:150},head:[['Core and coil build-up','']],body:P(M.build)});
+  d.autoTable({...base,startY:y,margin:{left:152,right:8},head:[['#','Item','kg','Rs/kg','Rs']],body:P(M.bom),columnStyles:{2:{halign:'right'},3:{halign:'right'},4:{halign:'right'}}});
+  d.addPage(); d.setFont('helvetica','bold'); d.setFontSize(11); d.setTextColor(...ink); d.text('Step-by-step calculation',8,12);
+  d.autoTable({...base,styles:{...base.styles,fontSize:6.5,cellPadding:0.7},startY:15,margin:{left:8,right:8},head:[['#','Item','Working','Result']],body:P(M.steps.map((s,i)=>[String(i+1),...s])),columnStyles:{0:{cellWidth:7},1:{cellWidth:38,fontStyle:'bold'},3:{cellWidth:66,fontStyle:'bold'}}});
+  const n=d.getNumberOfPages(); for(let i=1;i<=n;i++){ d.setPage(i); d.setFontSize(6); d.setTextColor(90); d.text(pdfText('Rect core design, '+RCUR.o.p.kVA+' kVA  |  Page '+i+' of '+n+'  |  Generated '+new Date().toLocaleString('en-GB')),8,205); }
+  saveFile(rfname('pdf'),d.output('blob'));
+});
+$('#rXlsx').addEventListener('click',()=>{
+  if(!RCUR) return; if(!window.XLSX){ toast('Excel library did not load. Reload the page.'); return; }
+  const M=RCUR.M, wb=XLSX.utils.book_new(); const cols=(ws,w)=>{ws['!cols']=w.map(x=>({wch:x}));return ws;};
+  const a=[[M.title.title],[],...M.title.cells,[],['WINDING DATA','',''],['Parameter',M.wind[0][1],M.wind[0][2]],...M.wind.slice(1),[],['CORE AND COIL BUILD-UP'],...M.build,[],['CORE'],...M.core,[],['IMPEDANCE VOLTAGE'],...M.imp,[],['LOSSES AND EFFICIENCY'],...M.loss,[],['MECHANICAL DETAILS'],...M.mech];
+  XLSX.utils.book_append_sheet(wb,cols(XLSX.utils.aoa_to_sheet(a),[36,34,34]),'CAL1');
+  XLSX.utils.book_append_sheet(wb,cols(XLSX.utils.aoa_to_sheet([['#','Parameter','Specification','Offered / design value','Status'],...M.comp,[],['Check','Requirement','Obtained','Result'],...M.checks.map(c=>[c.name,c.req,c.got,c.ok?'Pass':'Fail'])]),[6,50,45,55,12]),'Compliance');
+  XLSX.utils.book_append_sheet(wb,cols(XLSX.utils.aoa_to_sheet([['#','Item','kg','Rs/kg','Rs'],...M.bom]),[5,28,12,10,14]),'BOM');
+  XLSX.utils.book_append_sheet(wb,cols(XLSX.utils.aoa_to_sheet([['#','Item','Working','Result'],...M.steps.map((s,i)=>[i+1,...s])]),[5,28,90,40]),'Steps');
+  const snap=rSnapshot(); const labels={}; for(const el of rform.elements){ if(el.name){ const l=el.closest('label'); labels[el.name]=l?(l.querySelector('b')||l).textContent.replace('*','').trim():el.name; } }
+  XLSX.utils.book_append_sheet(wb,cols(XLSX.utils.aoa_to_sheet([['Field','Value','Description'],...Object.entries(snap.v).map(([k,v])=>[k,v,labels[k]||'']),[],['__req__',JSON.stringify(snap.req),'Requirement rows'],['__reqName__',snap.reqName,'Requirement name']]),[14,30,40]),'Inputs');
+  const out=XLSX.write(wb,{bookType:'xlsx',type:'array'}); saveFile(rfname('xlsx'),new Blob([out]));
+});
+
+// ---------- Saved designs (kept in this browser; export/import to move between devices) ----------
+const SKEY='rectDesigns.v1', LKEY='rectLast.v1';
+const sGet=k=>{ try{ return JSON.parse(localStorage.getItem(k)||'null'); }catch(e){ return null; } };
+const sSet=(k,v)=>{ try{ localStorage.setItem(k,JSON.stringify(v)); return true; }catch(e){ return false; } };
+function rSnapshot(){ const v={}; for(const el of rform.elements){ if(el.name) v[el.name]=el.value; } return {v,req:REQ,reqName:REQ_NAME,at:new Date().toISOString()}; }
+function rApply(s){ if(!s||!s.v) return; for(const el of rform.elements){ if(el.name&&s.v[el.name]!==undefined) el.value=s.v[el.name]; }
+  if(Array.isArray(s.req)&&s.req.length){ REQ=s.req; REQ_NAME=s.reqName||REQ_NAME; $('#reqStatus').textContent='Requirement: '+REQ_NAME+'.'; } rRun(); }
+function rList(sel){ const all=sGet(SKEY)||{}; const names=Object.keys(all).sort((a,b)=>(all[b].at||'').localeCompare(all[a].at||''));
+  const L=$('#savedList'); L.innerHTML=names.length?names.map(n=>'<option value="'+esc(n)+'">'+esc(n)+' — '+esc((all[n].v.kVA||'?')+' kVA, '+new Date(all[n].at).toLocaleDateString('en-GB'))+'</option>').join(''):'<option value="">No saved designs yet</option>';
+  if(sel) L.value=sel; }
+$('#saveBtn').addEventListener('click',()=>{ const s=rSnapshot(); const name=($('#saveName').value.trim())||((s.v.kVA||'')+' kVA '+(s.v.priV||'')+'/'+(s.v.secV||'')+' V');
+  const all=sGet(SKEY)||{}; const exists=!!all[name]; all[name]=s; if(!sSet(SKEY,all)){ toast('This browser blocked saving. Use Export designs instead.'); return; }
+  rList(name); $('#saveName').value=''; toast((exists?'Updated ':'Saved ')+'"'+name+'"'); });
+$('#loadBtn').addEventListener('click',()=>{ const n=$('#savedList').value; const all=sGet(SKEY)||{}; if(!n||!all[n]){ toast('Choose a saved design first.'); return; } rApply(all[n]); toast('Loaded "'+n+'"'); });
+$('#delBtn').addEventListener('click',()=>{ const n=$('#savedList').value; const all=sGet(SKEY)||{}; if(!n||!all[n]) return; delete all[n]; sSet(SKEY,all); rList(); toast('Deleted "'+n+'"'); });
+$('#expBtn').addEventListener('click',()=>{ const all=sGet(SKEY)||{}; if(!Object.keys(all).length){ toast('Save a design first, then export.'); return; }
+  saveFile('rect-core-designs.json',new Blob([JSON.stringify({type:'rect-core-designs',version:1,designs:all},null,1)],{type:'application/json'})); });
+$('#impFile').addEventListener('change',async e=>{ const f=e.target.files[0]; if(!f) return;
+  if(/\.xlsx?$/i.test(f.name)){ try{ const wb=XLSX.read(await f.arrayBuffer()); const ws=wb.Sheets['Inputs']; if(!ws) throw new Error('this Excel file has no Inputs sheet (only files downloaded from this page after this update have one)');
+      const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''}); const v={}; let req=null,reqName=null;
+      for(const r of rows.slice(1)){ if(!r[0]) continue; if(r[0]==='__req__'){ try{req=JSON.parse(r[1]);}catch(_){} } else if(r[0]==='__reqName__') reqName=r[1]; else v[r[0]]=String(r[1]); }
+      const name=f.name.replace(/\.[^.]+$/,''); const all=sGet(SKEY)||{}; all[name]={v,req,reqName,at:new Date().toISOString()}; sSet(SKEY,all); rList(name); rApply(all[name]); toast('Loaded and saved "'+name+'"');
+    }catch(err){ toast('Could not load: '+err.message); } e.target.value=''; return; }
+  try{ const j=JSON.parse(await f.text()); const inc=j.designs||j; const all=sGet(SKEY)||{}; let n=0;
+  for(const [k,v] of Object.entries(inc)){ if(v&&v.v){ all[k]=v; n++; } } if(!n) throw new Error('no designs in file'); sSet(SKEY,all); rList(); toast('Imported '+n+' design'+(n>1?'s':'')); }catch(err){ toast('Could not import: '+err.message); } e.target.value=''; });
+// remember the last inputs so a refresh does not lose them
+const _rRunOrig=rRun; rRun=function(){ _rRunOrig(); sSet(LKEY,rSnapshot()); };
+rList();
+{ const last=sGet(LKEY); if(last&&last.v&&last.v.kVA){ rApply(last); setTimeout(()=>{ $('#rAutoNote').textContent='Restored the inputs from your last visit. '+$('#rAutoNote').textContent; },900); } else rLoad(RPRESETS.sheet70); }
+
+</script>
+</body>
+</html>
