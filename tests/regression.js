@@ -33,6 +33,11 @@ const p6={...X.DEFAULTS,kVA:600,hvConn:'Y',lvConn:'D',lvMat:'Al',hvMat:'Al',insC
 const s=X.design(p6);
 near('LV strip b',s.lv.b,11,0); near('LV strip h',s.lv.h,4.8,0); near('LV section (mm²)',s.lv.cs,311.64,0.01); near('Core weight (kg)',s.core.W,1244,3); near('Impedance (%)',s.imp.ek,5.92,0.05);
 
+console.log('\nIEC 60076-5 checks added in v1.2');
+is('70 kVA: warns impedance below 4 % minimum (Table 1)',r.warn.some(w=>/recognised minimum of 4 %/.test(w)));
+is('70 kVA: inner compressive stress check passes',r.checks.find(c=>/inner \(compressive\)/.test(c.name)).ok);
+near('Table 1 minimum Z, 1000 kVA',X.STD.zMin(1000),5,0); near('Table 2 system MVA, Um 12 kV',X.STD.sysMVA(12),500,0);
+is('500 kVA: uses 500 MVA system default',o.faultUsed===500);
 console.log('\nStandards helpers');
 near('IEC ratio limit at Z = 2.91 %',X.STD.ratioLimit(2.91),0.291,1e-9); near('Altitude factor 2000 m',X.STD.altitudeFactor(2000),0.95,1e-9);
 near('Al σ @115 °C (61 % IACS)',X.STD.sigmaStd('Al',115),25.49,0.01); near('SC temp Al θ0=164.5 J=47.9 t=2',X.STD.scTemp('Al',164.5,47.9,2),251,1);

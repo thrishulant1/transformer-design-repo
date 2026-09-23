@@ -1,19 +1,20 @@
-# GitHub: test on every push; deploy to Pages from main only if the test passes.
-# In Settings → Pages, set Source = "GitHub Actions".
-name: test-and-deploy
+# GitHub: check the build and run the reference tests on every push; deploy main to Pages if both pass.
+# Settings → Pages → Source = "GitHub Actions".
+name: check-test-deploy
 on: [push, pull_request]
 permissions: {contents: read, pages: write, id-token: write}
 jobs:
-  regression:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: {node-version: 20}
+      - run: python3 tools/build.py --check
       - run: node tests/regression.js
   deploy:
     if: github.ref == 'refs/heads/main'
-    needs: regression
+    needs: test
     runs-on: ubuntu-latest
     environment: {name: github-pages, url: '${{ steps.d.outputs.page_url }}'}
     steps:

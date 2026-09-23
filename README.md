@@ -1,133 +1,187 @@
-# Dry-type transformer design calculator — v1.1.1
+# Dry-type transformer design calculator — v1.2.0
 
-A single-page web app with two design modules:
+A web app with two design modules:
 
-- **Rectangular core, LV/LV:** follows the RECT CORE TYPE CAL1 sheet. It includes:
-  - requirement-sheet import, automatic design and a compliance table with designer confirmations
-  - IEC short-circuit and tolerance checks
-  - guarantees and FAT test comparison with calibration
-  - a shared design library
-  - PDF and Excel export
-- **Round stepped core, HV distribution:** follows the 45-step method used for the 500 / 600 / 1600 kVA references. It has the same checks and the guarantees and tests tab.
+- **Rectangular core, LV/LV:** follows the RECT CORE TYPE CAL1 sheet.
+- **Round stepped core, HV distribution:** follows the 45-step method (500 / 600 / 1600 kVA references).
 
-Everything runs from `index.html`: calculations, screens and exports. There is no server and no build step. `tests/regression.js` re-checks the reference designs.
+Both modules include:
+- automatic design
+- IEC 60076-1 / -5 / -11 checks
+- guarantees and FAT comparison with calibration
+- dimensioned drawings
+- PDF and Excel export
+
+## Project layout
+
+```
+src/                 ← edit these files
+  page.html            page structure, styles, round-core screens and exports
+  rect-form.html       rectangular-core form
+  standards.js         IEC / IS values and formulas shared by both modules
+  engine-round.js      round-core calculation
+  engine-rect.js       rectangular-core calculation
+  guarantees.js        guarantees and FAT test comparison
+  drawing.js           dimensioned drawings, drawing page in the PDF
+  ui-rect.js           rectangular-core screens, library, exports
+tools/build.py       joins src/ into index.html
+index.html           the built app (do not edit by hand)
+tests/regression.js  45 checks against the reference designs
+supabase.sql         optional shared design library
+```
+
+**The one rule: edit `src/`, never `index.html`.**
+
+1. Change a file in `src/`.
+2. Run `python tools/build.py`. It rewrites `index.html`.
+3. Run `node tests/regression.js`. All checks must pass.
+4. Open `index.html` in the browser (VS Code: right-click → Open with Live Server) and check the change.
+5. Commit **both** the `src/` change and the new `index.html`.
+
+CI runs `python tools/build.py --check` first. If someone edited `index.html` directly, or forgot to rebuild, the pipeline stops and the site is not updated. This keeps everyone's edits in one place.
 
 ## Hosting
 
 **GitLab Pages (recommended, can be private)**
-1. Push all files to the default branch.
-2. The pipeline runs `tests/regression.js` first. **The site is only updated if every reference check passes.**
+1. Push everything.
+2. The pipeline runs: build check → 45 reference checks → publish.
 3. Find the link under **Deploy → Pages**.
-4. To keep it private, go to **Settings → General → Visibility → Pages → Only project members**, then add users under **Manage → Members**.
+4. To make it private: **Settings → General → Visibility → Pages → Only project members**.
 
 **GitHub Pages**
-1. Push all files and set **Settings → Pages → Source = GitHub Actions**.
-2. The workflow in `.github/workflows/pages.yml` tests first, then deploys `main`.
-3. On free accounts the repository and page must be public.
+1. Push everything and set **Settings → Pages → Source = GitHub Actions**.
+2. Free accounts need a public repository.
+
+After a deploy, press Ctrl+F5 on the live site to skip the browser's cached old version.
 
 ## Shared design library
 
 | Where the page is opened | Where "Save" stores designs |
 |---|---|
-| The claude.ai link | Shared live between everyone who opens that link (Claude shared storage) |
-| GitLab / GitHub with Supabase configured | Shared Supabase table; refreshed every 20 s and when the tab regains focus |
-| GitLab / GitHub without Supabase | This browser only. Use **Export designs** or the downloaded Excel to share |
+| The claude.ai link | Shared live between everyone who opens that link |
+| GitLab / GitHub with Supabase configured | Shared Supabase table (refreshed every 20 s and on focus) |
+| GitLab / GitHub without Supabase | This browser only. Share with **Export** or the downloaded Excel |
 
 **To switch on Supabase:**
 1. Create a free project at supabase.com.
 2. Run `supabase.sql` in its SQL editor.
-3. In `index.html`, search for `SHARED_LIBRARY=` (~line 1655) and fill in `supabaseUrl` and `supabaseAnonKey` (Project Settings → API).
-4. The sample policies let anyone with the link read and write. Tighten them before sharing outside your team.
+3. In `src/ui-rect.js`, fill in `SHARED_LIBRARY` with the URL and anon key.
+4. Rebuild.
+5. Tighten the sample security policies before sharing outside your team.
 
-Designs saved in a browser before the library was switched on can be moved with **Copy this browser's designs to the shared library**.
+## Downloads
 
-## Checking a change (automatic and manual)
+File names: `{work order or party}_{RECT|ROUND}_{kVA}kVA_{HV}-{LV}V_{revision}_{date}.pdf` (and `.xlsx`), for example `WO1234_RECT_70kVA_433-400V_R1_2026-09-23.pdf`.
 
-- **Automatic:** `node tests/regression.js` runs 40 checks against the reference designs. CI runs it on every push.
-- **Manual:** press **70 kVA — your design sheet**. It must show 2.91 %, 268 W, 1,384 W and 298 kg.
-- **Intentional change:** if you change a design rule on purpose (for example after calibration), update the expected value in `tests/regression.js` in the same commit, with a note of the test report behind it.
+| | Rectangular core | Round core |
+|---|---|---|
+| PDF | 1 design sheet · 2 general arrangement drawing · 3 compliance · 4 checks, build-up, bill of materials · 5 guarantees, tests, steps | 1 design sheet · 2 general arrangement drawing · 3 checks, guarantees · 4–5 steps, core steps, taps, clearances |
+| Excel | CAL1, Compliance, BOM, Steps, Values (numbers), Guarantees & tests, Inputs (reloadable) | Design sheet, Steps, Core steps, Taps, Checks, Values, Guarantees & tests, Inputs |
 
-## What changed in v1.1.1
+## What changed
 
-- PDF: every section is fitted to the fewest pages (smaller font only when it saves a page, never below 5.3 pt), so no orphan rows on an extra page. Rectangular core: 4 pages; round core: 4 pages.
-- Sidebar: scrolls on its own beside the results; collapsible sections; site / short-circuit fields moved to their own section; even button grids; larger drawing labels.
+**v1.2.0**
+- **IEC 60076-5 Table 1:** warns when impedance is below the recognised minimum (4 % up to 630 kVA): short-circuit withstand is then by agreement, and a duration below 2 s may be agreed when the fault current exceeds 25 × rated.
+- **Inner-winding compressive hoop stress check:** 0.35 × Rp0.2, or 0.6 × Rp0.2 for resin-bonded conductors (IS 2026-5 Annex A); 1.1 × mean for 3+ layers.
+- **Round core:** the system fault level defaults to IS 2026-5 Table 2 (500 MVA up to Um 24 kV, 1000 MVA at 36 kV) instead of an infinite bus.
+- **LV/LV compliance wording:** states that IEC 60076-11 is applied by agreement, because its scope is windings above 1.1 kV.
+- **File names:** consistent for both modules, with order reference, revision and date.
+- **Drawings:**
+  - Rectangular core: front section of all three limbs with every winding layer and duct, plus a dimensioned plan and radial build.
+  - Round core: plan through the windings with the real stepped core, plus a limb section with LV layers, HV coils and ducts.
+  - Both are added to the PDF as a general arrangement page.
+- **Project structure:** source files and build script in the repo; CI build check.
 
-## What changed in v1.1.0
+**v1.1.1:** PDF sections fitted to the fewest pages, no orphan rows; sidebar redesign.
 
-| Area | Change |
-|---|---|
-| Ratio tolerance | IEC 60076-1: the lower of 0.5 % and Z/10. Refined basis picks turns that meet it |
-| Conductivity | Choice of IEC standard (default for new designs), design-sheet values, or supplier certificate |
-| Axial length | Fullest layer rounded up to whole turns, then + extra turn per layer |
-| Loss reference temperature | Round core defaults by class per IEC 60076-11 (F 120 °C, H 145 °C) |
-| Zigzag | Dzn0 removed until zigzag windings are modelled |
-| Compliance | Rows the tool cannot calculate stay "To confirm" until ticked |
-| Header | Revision, checked by, PO, drawing no., tool version on every PDF page |
-| Short circuit | IEC 60076-5 thermal (2 s default), radial force, hoop stress, axial estimate; fault level and duration inputs; optional "required" in auto design |
-| Guarantees and tests | IEC 60076-1 tolerances, FAT comparison, calibration with Apply |
-| Auto design | Flux density searched when blank; runs in a background worker |
-| Other | Altitude derating, K-factor, E/C/F classes, PD note ≥ 3.6 kV, 60 Hz loss correction, noise estimate, IS 1180 / customer loss limits, round-core no-load current and cost, Excel "Values" sheet |
+**v1.1.0:**
+- **Checks and conductivity:** IEC ratio tolerance; conductivity choice.
+- **Short circuit, guarantees and tests:** IEC 60076-5 short-circuit checks; guarantees and tests tab.
+- **Automatic design:** flux density search and background search.
+- **Library and site data:** shared library; altitude, K-factor, E/C/F classes.
 
 ## What you can edit
 
-Open `index.html`, search for the text shown, change it, run `node tests/regression.js`, then commit. Line numbers are approximate.
+In VS Code press **Ctrl+Shift+F**, search for the text in the middle column, edit, then rebuild.
 
 ### Standards and shared rules
-| What | Search for |
-|---|---|
-| Tool version shown on sheets | `APP_VERSION=` (~443) |
-| Resistivity at 20 °C (Cu, Al) | `STD.RHO=` (~446) |
-| Reference temperature by class | `STD.REF_TEMP=` (~449) |
-| Rise limits by class, altitude derating | `STD.RISE=`, `STD.altitudeFactor` (~451) |
-| Test tolerances (+10 %, +15 %, +30 %, ±10 / ±7.5 %) | `STD.TOL=` (~457) |
-| Short-circuit temperature limits | `STD.SC_LIMIT=` (~460) |
-| Short-circuit calculation | `STD.shortCircuit=` (~466) |
-| Noise estimate formula | `STD.noise=` (~480) |
-| Frequency and harmonic factors | `STD.fLoss=`, `STD.kEddy=` (~482) |
+| What | Search for | File |
+|---|---|---|
+| Tool version shown on sheets | `APP_VERSION=` | `src/standards.js` |
+| Resistivity at 20 °C (Cu, Al) | `STD.RHO=` | `src/standards.js` |
+| Reference temperature by class | `STD.REF_TEMP=` | `src/standards.js` |
+| Rise limits by class, altitude derating | `STD.RISE=` | `src/standards.js` |
+| Test tolerances (+10 %, +15 %, +30 %, ±10 / ±7.5 %) | `STD.TOL=` | `src/standards.js` |
+| Short-circuit temperature limits (IS 2026-5 Table 3) | `STD.SC_LIMIT=` | `src/standards.js` |
+| Minimum impedance (Table 1), system MVA (Table 2) | `STD.zMin=` | `src/standards.js` |
+| Hoop stress limits (0.9 / 0.35 / 0.6 × Rp0.2) | `STD.compLimit=` | `src/standards.js` |
+| Short-circuit calculation | `STD.shortCircuit=` | `src/standards.js` |
+| Noise estimate | `STD.noise=` | `src/standards.js` |
+| Frequency and harmonic factors | `STD.fLoss=` | `src/standards.js` |
 
 ### Rectangular core
-| What | Search for |
-|---|---|
-| Core-loss table (CORELOSS sheet) | `RC.CORELOSS=` (~757) |
-| VA/kg table (VA sheet) | `RC.VAKG=` (~762) |
-| Design-sheet conductivity, density, stray factor | `RC.COND=` (~764) |
-| Lamination widths for auto design | `RC.LAM=` (~765) |
-| Main calculation | `function rectDesign` (~786) |
-| Temperature-rise rule | `const rise1=` (~867) |
-| Design checks list | `const chk=(name,req,got,ok)=>o.checks` (~902) |
-| Auto-design scoring | `function rcScore` (~934) |
-| Auto-design search ranges | `function rectAuto1` (~947) |
-| Engine defaults | `const RC_DEFAULTS=` (~995) |
-| Built-in requirement rows | `const REQ_DEFAULT=` (~1303) |
-| Form defaults, prices, names | `const RBASE=` (~1318) |
-| Preset buttons | `const RPRESETS=` (~1323) |
-| Which rows are declarations | `const R_DECL=` (~1441) |
-| Compliance wording | `function compRows` (~1453) |
+| What | Search for | File |
+|---|---|---|
+| Core-loss table (CORELOSS sheet) | `RC.CORELOSS=` | `src/engine-rect.js` |
+| VA/kg table (VA sheet) | `RC.VAKG=` | `src/engine-rect.js` |
+| Design-sheet conductivity, density, stray factor | `RC.COND=` | `src/engine-rect.js` |
+| Lamination widths for auto design | `RC.LAM=` | `src/engine-rect.js` |
+| Main calculation | `function rectDesign` | `src/engine-rect.js` |
+| Temperature-rise rule | `const rise1=` | `src/engine-rect.js` |
+| Design checks list | `const chk=(name,req,got,ok)=>o.checks` | `src/engine-rect.js` |
+| Auto-design scoring | `function rcScore` | `src/engine-rect.js` |
+| Auto-design search ranges | `function rectAuto1` | `src/engine-rect.js` |
+| Engine defaults | `const RC_DEFAULTS=` | `src/engine-rect.js` |
+| Built-in requirement rows | `const REQ_DEFAULT=` | `src/ui-rect.js` |
+| Form defaults, prices, names | `const RBASE=` | `src/ui-rect.js` |
+| Preset buttons (definitions) | `const RPRESETS=` | `src/ui-rect.js` |
+| Preset buttons (on screen) | `data-rpreset="auto70"` | `src/rect-form.html` |
+| Which rows are declarations | `const R_DECL=` | `src/ui-rect.js` |
+| Compliance wording | `function compRows` | `src/ui-rect.js` |
+| Drawing | `function rDrawing` | `src/ui-rect.js` |
+| PDF layout | `$('#rPdf')` | `src/ui-rect.js` |
+| Form fields | `name="kVA"` | `src/rect-form.html` |
 
-**Adding a preset button**, for example 8 kVA:
+**Adding a preset button** (for example 8 kVA):
 1. Download Excel for the design and copy the field names and values from its **Inputs** sheet.
-2. Add an entry to `RPRESETS`, for example `kva8:{...RBASE, kVA:8, ...}`.
-3. Add `<button class="btn sm" data-rpreset="kva8">8 kVA</button>` next to `data-rpreset="auto70"`.
+2. Add `kva8:{...RBASE, kVA:8, ...},` to `RPRESETS`.
+3. Add `<button class="btn sm" data-rpreset="kva8">8 kVA</button>` next to the other preset buttons.
+4. Rebuild.
 
 ### Round core
-| What | Search for |
-|---|---|
-| Core-loss tables | `CORE_GRADES = {` (~491) |
-| Clearances and test voltages by HV class | `function hvClass` (~503) |
-| Main calculation | `function design(p)` (~526) |
-| Ratio, no-load current, short circuit, checks | `Phase 2: ratio tolerance` (~682) |
-| Auto optimiser | `function designAuto` (~721) |
-| Reference presets | `const PRESETS=` (~1062) |
+| What | Search for | File |
+|---|---|---|
+| Core-loss tables | `CORE_GRADES = {` | `src/engine-round.js` |
+| Clearances and test voltages by HV class | `function hvClass` | `src/engine-round.js` |
+| Main calculation | `function design(p)` | `src/engine-round.js` |
+| Ratio, no-load current, short circuit, checks | `Phase 2: ratio tolerance` | `src/engine-round.js` |
+| Auto optimiser | `function designAuto` | `src/engine-round.js` |
+| Reference presets | `const PRESETS=` | `src/page.html` |
+| Drawing | `function roundDrawing` | `src/page.html` |
+| PDF layout | `$('#dlPdf')` | `src/page.html` |
+| File names (both modules) | `function designFileName` | `src/page.html` |
 
-### Guarantees and tests (both modules)
-| What | Search for |
-|---|---|
-| Tolerances table and pass/fail logic | `function gtRows` (~1014) |
-| Calibration factors | `function gtCal` (~1036) |
+### Shared
+| What | Search for | File |
+|---|---|---|
+| Guarantee tolerances and pass/fail | `function gtRows` | `src/guarantees.js` |
+| Calibration factors | `function gtCal` | `src/guarantees.js` |
+| Dimension lines, colours, drawing to PDF | `function drwPal` | `src/drawing.js` |
+| Colours and fonts of the page | `:root{` | `src/page.html` |
+| Page title and intro | `<header class="top">` | `src/page.html` |
+
+## Checking a change
+- **Automatic:** `python tools/build.py --check` and `node tests/regression.js` (45 checks). Both run in CI on every push.
+- **Manual:** **Your 70 kVA sheet** must show 2.91 %, 268 W, 1,384 W and 298 kg.
+- **Intentional rule change** (for example after calibration): update the expected value in `tests/regression.js` in the same commit, with the test report reference.
+
+## To verify against your copy of the standards
+- Loss reference temperatures by class in `STD.REF_TEMP` (F 120 °C, H 145 °C), IEC 60076-11 Annex D.
+- Hoop-stress Rp0.2 of your conductor (defaults: Cu 80 MPa, Al 35 MPa as the 0.9 × Rp0.2 tensile limit).
 
 ## Known limits (next phase)
-- Hoop stress uses a circular-equivalent formula. Rectangular coils have higher corner stresses, so verify critical designs separately.
+- Foil, zigzag and HV disc windings, and single-phase units, are not modelled.
+- Rectangular-coil corner stresses (the hoop stress is a circular-equivalent value).
 - Axial short-circuit force is an estimate.
-- The noise formula needs one measured unit to calibrate its constant: use the Tests tab, then Apply.
-- Foil windings, zigzag windings and HV disc windings are not modelled.
-- The temperature-rise rule is the design sheet's empirical rule. Calibrate it with heat-run results in the Tests tab.
+- Noise needs one measured unit to calibrate.
+- The temperature-rise rule is the design sheet's empirical rule. Calibrate it from heat-run results in the Tests tab.

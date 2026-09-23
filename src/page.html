@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Dry-type transformer design calculator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#E9EDF0; --panel:#F8FAFB; --sheet:#FFFFFF; --ink:#17212B; --ink2:#4A5866; --rule:#C3CCD5; --rule2:#E1E6EB;
+  --accent:#0F5E5C; --accent-ink:#FFFFFF; --lv:#C08A1E; --hv:#9B4A26; --core:#5C6B78; --ok:#2E7D4F; --bad:#B23A2E; --warnbg:#FBEDE9;
+  --fh:'Barlow Condensed','Arial Narrow',Arial,sans-serif; --fb:'Barlow','Segoe UI',Arial,sans-serif;
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){ --bg:#141A20; --panel:#1B232B; --sheet:#F7F8F9; --ink:#E6EBEF; --ink2:#9AA8B5; --rule:#34414D; --rule2:#26313B; --accent:#3FA7A3; --accent-ink:#0B1A1A; --warnbg:#3A2320; } }
+:root[data-theme="dark"]{ --bg:#141A20; --panel:#1B232B; --sheet:#F7F8F9; --ink:#E6EBEF; --ink2:#9AA8B5; --rule:#34414D; --rule2:#26313B; --accent:#3FA7A3; --accent-ink:#0B1A1A; --warnbg:#3A2320; }
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--fb);font-size:15px;line-height:1.45;font-variant-numeric:tabular-nums}
+header.top{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:20px 24px 14px;border-bottom:2px solid var(--ink)}
+header.top h1{font-family:var(--fh);font-weight:700;font-size:clamp(26px,4vw,40px);line-height:1;margin:0;letter-spacing:.2px}
+header.top p{margin:6px 0 0;color:var(--ink2);max-width:62ch}
+.presets{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.btn.sm{padding:5px 9px;font-size:13px}
+.tabs.mode button{padding:9px 16px;font-size:15px}
+button{font:inherit;cursor:pointer}
+.btn{border:1.5px solid var(--ink);background:transparent;color:var(--ink);padding:7px 12px;border-radius:3px;font-weight:600;font-size:14px}
+.btn:hover{background:var(--rule2)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{filter:brightness(1.08)}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.layout{display:grid;grid-template-columns:minmax(300px,380px) 1fr;gap:0;min-height:calc(100vh - 100px)}
+@media (max-width:900px){.layout{grid-template-columns:1fr}}
+@media (max-width:560px){.kpis{grid-template-columns:repeat(2,1fr)}}
+aside.form{background:var(--panel);border-right:1px solid var(--rule);padding:16px 18px 40px}
+@media (max-width:900px){aside.form{border-right:0;border-bottom:1px solid var(--rule)}}
+fieldset{border:0;margin:0 0 18px;padding:0}
+legend{font-family:var(--fh);font-weight:600;font-size:19px;padding:0;margin-bottom:8px;display:flex;gap:8px;align-items:baseline}
+legend small{font-family:var(--fb);font-weight:400;font-size:12.5px;color:var(--ink2)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px}
+.full{grid-column:1/-1}
+label{display:flex;flex-direction:column;gap:3px;font-size:13px;color:var(--ink2)}
+label b{color:var(--ink);font-weight:600}
+label .req{color:var(--bad)}
+input,select{font:inherit;font-size:14.5px;color:var(--ink);background:var(--bg);border:1px solid var(--rule);border-radius:3px;padding:6px 8px;width:100%;min-width:0}
+input::placeholder{color:var(--ink2);opacity:.75}
+details{border-top:1px solid var(--rule);padding-top:10px}
+summary{font-family:var(--fh);font-weight:600;font-size:18px;cursor:pointer;margin-bottom:8px}
+.hint{font-size:12.5px;color:var(--ink2);margin:6px 0 0}
+main{padding:16px 22px 60px;min-width:0}
+.bar{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:14px}
+.tabs{display:flex;gap:0;border:1.5px solid var(--ink);border-radius:3px;overflow:hidden}
+.tabs button{border:0;background:transparent;color:var(--ink);padding:7px 14px;font-weight:600;font-size:14px}
+.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg)}
+.exports{display:flex;gap:8px;flex-wrap:wrap}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--rule);border:1px solid var(--rule);margin-bottom:14px}
+.kpi{background:var(--panel);padding:10px 12px}
+.kpi span{display:block;font-size:12.5px;color:var(--ink2)}
+.kpi strong{font-family:var(--fh);font-size:26px;font-weight:600;line-height:1.1}
+.kpi em{font-style:normal;font-size:12.5px;color:var(--ink2);margin-left:3px}
+.kpi.bad strong{color:var(--bad)}
+.warns{margin:0 0 14px;padding:10px 14px;background:var(--warnbg);border-left:4px solid var(--bad);display:none}
+.warns.on{display:block}
+.warns ul{margin:4px 0 0;padding-left:18px}
+.okline{margin:0 0 14px;color:var(--ok);font-weight:600;display:none}
+.okline.on{display:block}
+.drawing{background:var(--panel);border:1px solid var(--rule);padding:10px 12px 6px;margin-bottom:14px;overflow-x:auto}
+.drawing h2,.panel h2{font-family:var(--fh);font-size:19px;font-weight:600;margin:0 0 6px}
+.drawing svg{display:block;width:100%;height:auto;min-width:560px;max-height:760px}
+/* the paper sheet */
+.sheet{background:var(--sheet);color:#17212B;border:1px solid #9AA6B2;box-shadow:0 1px 0 #9AA6B2;padding:14px;overflow-x:auto}
+.sheet h3{font-family:var(--fh);font-size:17px;font-weight:700;margin:14px 0 4px;color:#17212B;border-bottom:1.5px solid #17212B;padding-bottom:2px}
+.sheet h3:first-child{margin-top:0}
+.sheet table{border-collapse:collapse;width:100%;font-size:13px}
+.sheet td,.sheet th{border:1px solid #AEB8C2;padding:3px 7px;text-align:left;vertical-align:top}
+.sheet th{background:#EEF1F4;font-weight:600}
+.sheet td.n{text-align:right}
+.sheet .cols{display:grid;grid-template-columns:3fr 2fr;gap:14px}
+@media (max-width:1150px){.sheet .cols{grid-template-columns:1fr}}
+.titleblock{display:grid;grid-template-columns:repeat(4,1fr);border:1.5px solid #17212B;font-size:13px}
+.titleblock div{padding:4px 8px;border-right:1px solid #AEB8C2;border-bottom:1px solid #AEB8C2}
+.titleblock div span{display:block;font-size:11px;color:#56616C}
+.titleblock .big{grid-column:1/-1;font-family:var(--fh);font-size:22px;font-weight:700;border-bottom:1.5px solid #17212B}
+@media (max-width:640px){.titleblock{grid-template-columns:1fr 1fr}}
+.steps table{font-size:13px}
+.steps td:first-child{width:36px;text-align:center;font-weight:600}
+.steps td.r{white-space:nowrap;font-weight:600}
+.steps .formula{color:#3E4A56}
+.steps .note{display:block;color:#56616C;font-size:12px}
+.steps tr.grp td{background:#17212B;color:#fff;font-family:var(--fh);font-size:15px;font-weight:600;letter-spacing:.3px}
+[hidden]{display:none!important}
+.toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:3px;font-weight:600;opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.on{opacity:1}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}}
+.libmode{font-weight:400;font-size:12px;color:var(--ink2);margin-left:6px}
+.tblwrap{overflow-x:auto}
+.gtbar{display:flex;gap:14px;flex-wrap:wrap;margin:6px 0 8px}.gtbar label{flex-direction:column;font-size:13px;color:#56616C}
+.gtin{width:96px;padding:3px 6px;font-size:13px;background:#fff;color:#17212B;border:1px solid #AEB8C2}
+.gtro{font-weight:600}
+.callist{margin:4px 0 8px;padding-left:18px}.callist li{margin:4px 0}
+label.conf{flex-direction:row;align-items:center;gap:5px;color:inherit;font-size:13px}
+
+/* sidebar: scrolls on its own beside the results on desktop */
+@media (min-width:901px){ .layout>aside.form{position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable} }
+.presets{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px}
+.presets .btn{width:100%;text-align:center;justify-content:center}
+.presets .wide{grid-column:1/-1}
+.btn.filebtn{justify-content:center;text-align:center}
+details.sec{border-top:1px solid var(--rule);padding:10px 0 6px;margin:0}
+details.sec>summary{list-style:none;display:flex;align-items:baseline;gap:8px;font-family:var(--fh);font-weight:600;font-size:18px;cursor:pointer;margin:0 0 8px;color:var(--ink)}
+details.sec>summary::-webkit-details-marker{display:none}
+details.sec>summary::before{content:'';flex:0 0 auto;width:7px;height:7px;border-right:2px solid var(--ink2);border-bottom:2px solid var(--ink2);transform:rotate(-45deg);margin-right:4px;align-self:center;transition:transform .15s}
+details.sec[open]>summary::before{transform:rotate(45deg)}
+details.sec>summary small{font-family:var(--fb);font-weight:400;font-size:12.5px;color:var(--ink2)}
+details.sec:not([open])>summary{margin-bottom:0}
+@media (prefers-reduced-motion:reduce){details.sec>summary::before{transition:none}}
+.grid2>label,.grid4>label{min-width:0}
+label b{white-space:normal}
+</style>
+</head>
+<body>
+<header class="top">
+  <div>
+    <h1>Dry-type transformer design calculator</h1>
+    <p>Enter the requirement and the design sheet fills itself, with a compliance check and PDF or Excel download.</p>
+  </div>
+  <div class="tabs mode" role="tablist" aria-label="Core type">
+    <button role="tab" aria-selected="false" data-mode="round">Round stepped core</button>
+    <button role="tab" aria-selected="true" data-mode="rect">Rectangular core, LV/LV</button>
+  </div>
+</header>
+
+<div class="layout" id="layout-round" hidden>
+<aside class="form">
+  <div class="presets" aria-label="Load a reference design">
+    <button class="btn sm" data-preset="p500">500 kVA Cu</button>
+    <button class="btn sm" data-preset="p600">600 kVA Al</button>
+    <button class="btn sm" data-preset="p1600">1600 kVA Cu</button>
+    <button class="btn sm" data-preset="blank">Defaults</button>
+  </div>
+<form id="f" autocomplete="off" onsubmit="return false">
+  <details class="sec" open>
+    <summary>Rating <small><span class="req">*</span> required</small></summary>
+    <div class="grid2">
+      <label><b>Capacity, kVA <span class="req">*</span></b><input name="kVA" type="number" min="5" step="any" required></label>
+      <label><b>Frequency, Hz <span class="req">*</span></b><select name="freq"><option>50</option><option>60</option></select></label>
+      <label><b>HV line voltage, V <span class="req">*</span></b><input name="hvV" type="number" min="100" step="any" required></label>
+      <label><b>LV line voltage, V <span class="req">*</span></b><input name="lvV" type="number" min="50" step="any" required></label>
+      <label><b>Vector group <span class="req">*</span></b><select name="vg">
+        <option>Dyn11</option><option>Dyn1</option><option>Dyn5</option><option>Ynd11</option><option>Ynd1</option><option>Yyn0</option><option>Dd0</option></select></label>
+      <label><b>Insulation class <span class="req">*</span></b><select name="insClass"><option>B</option><option selected>F</option><option>H</option></select></label>
+      <label><b>LV conductor <span class="req">*</span></b><select name="lvMat"><option value="Cu">Copper</option><option value="Al">Aluminium</option></select></label>
+      <label><b>HV conductor <span class="req">*</span></b><select name="hvMat"><option value="Cu">Copper</option><option value="Al">Aluminium</option></select></label>
+    </div>
+  </details>
+
+  <details class="sec" open>
+    <summary>Design choices <small>defaults are typical</small></summary>
+    <div class="grid2">
+      <label><b>Constant k</b><input name="k" type="number" step="0.001" min="0.2" max="1"></label>
+      <label><b>Flux density, T</b><input name="B" type="number" step="0.01" min="1" max="1.8"></label>
+      <label><b>LV current density, A/mm²</b><input name="Jlv" type="number" step="0.01" min="0.5" max="4"></label>
+      <label><b>HV current density, A/mm²</b><input name="Jhv" type="number" step="0.01" min="0.5" max="4"></label>
+      <label><b>Tap plus, %</b><input name="tapPlus" type="number" step="0.5" min="0"></label>
+      <label><b>Tap minus, %</b><input name="tapMinus" type="number" step="0.5" min="0"></label>
+      <label><b>Tap step, %</b><input name="tapStep" type="number" step="0.5" min="0"></label>
+      <label><b>Target impedance, %</b><input name="zTarget" type="number" step="0.1" min="0"></label>
+      <label><b>Core grade</b><select name="grade"><option value="M4-0.27">CRGO M4 0.27</option><option value="M3-0.23">CRGO M3 0.23</option><option value="23ZDMH-0.23">23ZDMH 0.23</option></select></label>
+      <label><b>Core joint</b><select name="joint"><option value="mitred">Mitred</option><option value="step">Step-lap</option></select></label>
+      <label><b>Loss reference temp, °C</b><select name="refTemp"><option value="auto">By class (IEC 60076-11)</option><option>75</option><option>90</option><option>100</option><option>115</option><option>120</option><option>145</option></select></label>
+      <label><b>Enclosure</b><select name="enclosure"><option value="1">IP23 enclosure</option><option value="0">Without</option></select></label>
+    </div>
+  </details>
+  <details class="sec">
+    <summary>Site, short circuit and loss limits</summary>
+    <div class="grid2">
+      <label><b>Ambient, °C</b><input name="amb" type="number" step="1"></label>
+      <label><b>Altitude, m</b><input name="altitude" type="number" step="100" min="0"></label>
+      <label><b>System fault level, MVA</b><input name="faultMVA" type="number" step="any" placeholder="IS 2026-5 default"></label>
+      <label><b>Short-circuit duration, s</b><input name="scTime" type="number" step="0.5" min="0.25"></label>
+      <label><b>Max total loss @50 %, W</b><input name="maxLoss50" type="number" step="1" placeholder="IS 1180 / customer"></label>
+      <label><b>Max total loss @100 %, W</b><input name="maxLoss100" type="number" step="1" placeholder="IS 1180 / customer"></label>
+      <label><b>Noise max, dB</b><input name="noiseMax" type="number" step="1" placeholder="optional"></label>
+    </div>
+  </details>
+
+  <button type="button" class="btn sm" id="fixRound" hidden style="margin-bottom:10px">Copy the automatic values into the Advanced fields</button>
+  <details id="adv" class="sec">
+    <summary>Advanced <small>blank = automatic sizing</small></summary>
+    <div class="grid2">
+      <label><b>Window height, mm</b><input name="window" type="number" placeholder="auto"></label>
+      <label><b>Core diameter, mm</b><input name="coreDia" type="number" placeholder="auto"></label>
+      <label><b>LV end clearance, mm</b><input name="lvEnd" type="number" placeholder="auto"></label>
+      <label><b>HV end clearance, mm</b><input name="hvEnd" type="number" placeholder="auto"></label>
+      <label><b>LV turns / phase</b><input name="lvTurns" type="number" placeholder="auto"></label>
+      <label><b>LV layers</b><input name="lvLayers" type="number" placeholder="auto"></label>
+      <label><b>LV axial parallels</b><input name="lvAx" type="number" placeholder="auto"></label>
+      <label><b>LV radial parallels</b><input name="lvRad" type="number" placeholder="auto"></label>
+      <label><b>LV transposition, mm</b><input name="lvTransp" type="number" placeholder="30"></label>
+      <label><b>LV air ducts</b><input name="lvDucts" type="number" placeholder="auto"></label>
+      <label><b>LV duct width, mm</b><input name="lvDuctT" type="number" placeholder="auto"></label>
+      <label><b>Core to LV, mm</b><input name="coreLV" type="number" placeholder="10"></label>
+      <label><b>HV coils / phase</b><input name="hvCoils" type="number" placeholder="auto"></label>
+      <label><b>HV conductor</b><select name="hvCond"><option value="auto">Auto</option><option value="round">Round wire</option><option value="strip">Strip</option></select></label>
+      <label><b>HV air ducts</b><input name="hvDucts" type="number" placeholder="auto"></label>
+      <label><b>HV duct width, mm</b><input name="hvDuctT" type="number" placeholder="12"></label>
+      <label><b>LV–HV gap, mm</b><input name="lvhvGap" type="number" placeholder="auto"></label>
+      <label><b>HV phase gap, mm</b><input name="phaseGap" type="number" placeholder="auto"></label>
+      <label><b>HV coil-to-coil gap, mm</b><input name="hvCoilGap" type="number" placeholder="12"></label>
+      <label><b>HV inter-layer min, mm</b><input name="hvMinIns" type="number" step="0.01" placeholder="0.05"></label>
+      <label><b>LV conductor insulation, mm</b><input name="lvIns" type="number" step="0.01" placeholder="0.3"></label>
+      <label><b>HV round insulation, mm</b><input name="hvInsRound" type="number" step="0.01" placeholder="0.2"></label>
+      <label><b>HV strip insulation, mm</b><input name="hvInsStrip" type="number" step="0.01" placeholder="0.44"></label>
+      <label><b>Enclosure clearance, mm</b><input name="enclClr" type="number" placeholder="200"></label>
+      <label><b>Conductor bonding</b><select name="bonded"><option value="0">Regular strands</option><option value="1">Resin-bonded</option></select></label>
+      <label><b>Rise calibration LV / HV</b><span class="pair"><input name="riseCal1" type="number" step="0.01" placeholder="1" aria-label="LV rise calibration"><input name="riseCal2" type="number" step="0.01" placeholder="1" aria-label="HV rise calibration"></span></label>
+      <label><b>Prices core / Cu / Al, ₹/kg</b><span class="pair"><input name="pCore" type="number" placeholder="270" aria-label="core price"><input name="pCu" type="number" placeholder="900" aria-label="copper price"><input name="pAl" type="number" placeholder="440" aria-label="aluminium price"></span></label>
+    </div>
+    <p class="hint">Automatic rules follow the step method: clearances by HV insulation level (IS 11171), duct width by winding length, LV parallels chosen for the fewest strips with height ≤ 5 mm (Cu) or 6 mm (Al).</p>
+  </details>
+
+  <details class="sec">
+    <summary>Sheet header</summary>
+    <div class="grid2">
+      <label class="full"><b>Party / customer</b><input name="party"></label>
+      <label><b>Work order</b><input name="wo"></label>
+      <label><b>Design ref.</b><input name="ref"></label>
+      <label><b>Designed by</b><input name="by"></label>
+      <label><b>Approved by</b><input name="appr"></label>
+      <label><b>Checked by</b><input name="chk"></label>
+      <label><b>Revision</b><input name="rev" placeholder="R0"></label>
+      <label><b>Customer PO</b><input name="po"></label>
+      <label><b>Drawing no.</b><input name="dwg"></label>
+    </div>
+  </details>
+</form>
+</aside>
+
+<main>
+  <div class="bar">
+    <div class="tabs" role="tablist">
+      <button role="tab" aria-selected="true" data-tab="sheet">Design sheet</button>
+      <button role="tab" aria-selected="false" data-tab="checks">Checks and tests</button>
+      <button role="tab" aria-selected="false" data-tab="steps">Step-by-step</button>
+    </div>
+    <div class="exports">
+      <button class="btn primary" id="dlPdf">Download PDF</button>
+      <button class="btn" id="dlXlsx">Download Excel</button>
+    </div>
+  </div>
+  <div class="kpis" id="kpis"></div>
+  <div class="warns" id="warns"><strong>Check these before release</strong><ul></ul></div>
+  <p class="okline" id="okline">All checks pass: flux, current densities, gradients and impedance are within limits.</p>
+  <section id="tab-sheet">
+    <div class="drawing"><h2>General arrangement, to scale</h2><div id="svgwrap"></div></div>
+    <div class="sheet" id="sheet"></div>
+  </section>
+  <section id="tab-checks" hidden><div class="sheet" id="checks"></div></section>
+  <section id="tab-steps" hidden>
+    <div class="sheet steps" id="steps"></div>
+  </section>
+</main>
+</div>
+/*__RECT_HTML__*/
+<div class="toast" id="toast" role="status"></div>
+
+<script id="engines">
+/*__ENGINE__*/
+</script>
+<script>
+const $=(s,el=document)=>el.querySelector(s), $$=(s,el=document)=>[...el.querySelectorAll(s)];
+const form=$('#f');
+const MAT_DEF={Cu:{k:0.50,Jlv:2.2,Jhv:2.4},Al:{k:0.43,Jlv:1.4,Jhv:1.5}};
+const BASE={kVA:500,freq:50,hvV:11000,lvV:415,vg:'Dyn11',insClass:'F',lvMat:'Cu',hvMat:'Cu',k:0.50,B:1.60,Jlv:2.2,Jhv:2.4,tapPlus:5,tapMinus:5,tapStep:2.5,zTarget:5,
+  grade:'M4-0.27',joint:'mitred',refTemp:'auto',enclosure:'1',hvCond:'auto',party:'',wo:'',ref:'',by:'',appr:'',chk:'',rev:'R0',po:'',dwg:'',amb:40,altitude:1000,scTime:2};
+const PRESETS={
+  blank:BASE,
+  p500:{...BASE,kVA:500,k:0.56,B:1.64,Jlv:2.0,Jhv:2.4,tapPlus:2.5,tapMinus:7.5,tapStep:2.5,window:650,lvEnd:110,hvEnd:140,lvAx:4,lvRad:2,lvDucts:1,lvDuctT:10,
+    hvCoils:6,hvCond:'round',hvDucts:0,lvhvGap:31,phaseGap:31,refTemp:75,ref:'500 kVA 11000/415 V Class F'},
+  p600:{...BASE,kVA:600,vg:'Ynd11',insClass:'H',lvMat:'Al',hvMat:'Al',k:0.4236,B:1.55,Jlv:1.55,Jhv:1.62,tapPlus:0,tapMinus:0,tapStep:0,zTarget:6,refTemp:115,
+    window:995,lvEnd:130,hvEnd:140,lvAx:3,lvRad:2,lvTransp:20,lvDucts:1,lvDuctT:12,hvCoils:1,hvCond:'strip',hvDucts:2,hvDuctT:12,hvMinIns:0.26,lvhvGap:29,phaseGap:43,
+    ref:'600 kVA 11000/415 V Class H'},
+  p1600:{...BASE,kVA:1600,k:0.428,B:1.596,Jlv:2.33,Jhv:2.14,tapPlus:5,tapMinus:5,tapStep:2.5,zTarget:6.25,refTemp:90,window:1217,lvEnd:60,hvEnd:140,lvDucts:1,lvDuctT:16,
+    hvCoils:8,hvCond:'strip',lvhvGap:50,phaseGap:60,ref:'1600 kVA 11000/415 V Class F'}
+};
+const NUM=new Set(['kVA','freq','hvV','lvV','k','B','Jlv','Jhv','tapPlus','tapMinus','tapStep','zTarget','refTemp','window','coreDia','lvEnd','hvEnd','lvTurns','lvLayers','lvAx','lvRad','lvTransp','lvDucts','lvDuctT','coreLV','hvCoils','hvDucts','hvDuctT','lvhvGap','phaseGap','hvCoilGap','hvMinIns','lvIns','hvInsRound','hvInsStrip','enclClr','amb','altitude','faultMVA','scTime','maxLoss50','maxLoss100','noiseMax','riseCal1','riseCal2','pCore','pCu','pAl']);
+function loadPreset(key){ const p=PRESETS[key]; for(const el of form.elements){ if(!el.name) continue; const v=p[el.name]; el.value=(v===undefined||v===null)?'':v; } run(); }
+function readInputs(){
+  const v={}; for(const el of form.elements){ if(!el.name) continue; const s=el.value.trim(); v[el.name]=NUM.has(el.name)?(s===''?null:parseFloat(s)):s; }
+  const vg=v.vg; const hvConn=vg[0]==='D'?'D':'Y'; const lvConn=/d/.test(vg.slice(1))?'D':'Y';
+  const p={...DEFAULTS_AUTO,...Object.fromEntries(Object.entries(v).filter(([k,x])=>x!==null&&x!==''))};
+  p.hvConn=hvConn; p.lvConn=lvConn; p.enclosure=v.enclosure==='1';
+  ['window','coreDia','lvEnd','hvEnd','lvTurns','lvLayers','lvAx','lvRad','lvDucts','lvDuctT','hvCoils','hvDucts','lvhvGap','phaseGap'].forEach(k=>{ if(v[k]===null) p[k]=null; });
+  if(p.lvAx&&!p.lvRad) p.lvRad=1; if(p.lvRad&&!p.lvAx) p.lvAx=null;
+  p.refTemp=(v.refTemp==='auto'||!v.refTemp)?STD.REF_TEMP[p.insClass]:parseFloat(v.refTemp);
+  p.price={core:v.pCore??270,Cu:v.pCu??900,Al:v.pAl??440,steel:200,ins:500,others:15};
+  if(v.faultMVA===null) p.faultMVA=null;
+  p.bonded=v.bonded==='1';
+  return {p,meta:v};
+}
+const DEFAULTS_AUTO={sf:0.97,lvTransp:30,lvIns:0.3,lvMinIns:0.1,lvTol:0.3,coreLV:10,hvCoilGap:12,hvCond:'auto',hvInsRound:0.2,hvInsStrip:0.44,hvMinIns:0.05,hvTol:0.1,
+  hvDuctT:12,Eb:10000,hdInner:6,hdOuter:8,enclClr:200,bottomClr:100,refTemp:75,tapStep:2.5,tapPlus:0,tapMinus:0};
+// Auto-update k & J when material changes
+form.addEventListener('change',e=>{ if(e.target.name==='lvMat'){ const d=MAT_DEF[e.target.value]; form.k.value=d.k; form.Jlv.value=d.Jlv; } if(e.target.name==='hvMat'){ form.Jhv.value=MAT_DEF[e.target.value].Jhv; } });
+let timer; form.addEventListener('input',()=>{ clearTimeout(timer); timer=setTimeout(run,250); }); form.addEventListener('change',()=>{ clearTimeout(timer); run(); });
+
+const f1=(x,n=1)=>(x==null||isNaN(x))?'–':Number(x).toFixed(n);
+const f0=x=>(x==null||isNaN(x))?'–':Math.round(x).toLocaleString('en-IN');
+let CUR=null;
+
+function buildModel(o,m){
+  const p=o.inp, lv=o.lv, hv=o.hv, c=o.core, H=hv.cond, T=p.refTemp;
+  const vg=m.vg, date=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+  const title={title:'Electrical design calculation — '+p.kVA+' kVA '+p.hvV+' / '+p.lvV+' V, indoor dry type, class '+p.insClass,
+    cells:[['Party',m.party||'—'],['Work order',m.wo||'—'],['Design ref.',m.ref||(p.kVA+' kVA '+p.hvV+'/'+p.lvV+' V')],['Date',date],
+      ['Rating',p.kVA+' kVA, 3 phase'],['Voltage ratio',p.hvV+' / '+p.lvV+' V'],['Vector group',vg],['Frequency',p.freq+' Hz'],
+      ['Cooling','AN (natural air)'],['Insulation class',p.insClass+' ('+o.rise+' K rise)'],['Standards','IS 11171, IS 2026, IEC 60076-5/-11'],['Designed / checked / approved',(m.by||'—')+' / '+(m.chk||'—')+' / '+(m.appr||'—')],
+      ['Revision',m.rev||'R0'],['Customer PO',m.po||'—'],['Drawing no.',m.dwg||'—'],['Loss reference',T+' °C'+(m.refTemp==='auto'?' (by class)':'')],['Altitude / ambient',(p.altitude||0)+' m / '+(p.amb??40)+' °C'],['Tool version',APP_VERSION]]};
+  const core=[['Frame (D / window / centres)',c.D+' / '+o.window+' / '+c.CD+' mm'],['Core diameter',c.D+' mm, '+c.steps.length+' steps'],
+    ['Net core area',f1(c.Anet/100,2)+' cm²'],['Stacking factor',p.sf],['Core utilisation (steps/circle)',f1(c.util*100,1)+' %'],
+    ['Volts / turn',f1(lv.V/lv.N,4)+' V'],['Flux density',f1(c.B,3)+' T ('+f0(c.B*10000)+' G)'],['Steel grade / joint',p.grade+' / '+(p.joint==='step'?'step-lap':'mitred')],
+    ['Core mass',f0(c.W)+' kg'],['Specific loss × build factor',f1(c.sl,3)+' W/kg × '+c.bf],['No-load loss (calc.)',f0(c.NLL)+' W']];
+  const hvType=H.type==='round'?'Multi-layer coils, round wire':'Multi-layer coils, strip';
+  const tv=o.cls; const lvCls=p.lvV<=1100;
+  const wind=[
+    ['Connection',(p.lvConn==='D'?'Delta':'Star')+', helical strip',(p.hvConn==='D'?'Delta':'Star')+', '+hvType.toLowerCase()],
+    ['Rated voltage (line / phase)',p.lvV+' / '+f1(lv.V,1)+' V',p.hvV+' / '+f1(hv.V,1)+' V'],
+    ['Rated current / phase',f1(lv.I,2)+' A',f1(hv.I,3)+' A (min tap '+f1(hv.Imin,3)+')'],
+    ['Turns / limb',String(lv.N),hv.Nmax+' – '+hv.Nn+' – '+hv.Nmin+' (max–nor–min)'],
+    ['Conductor bare',lv.b+' × '+lv.h+' mm',H.type==='round'?'Ø '+H.d.toFixed(2)+' mm':H.w+' × '+H.t.toFixed(2)+' mm'],
+    ['Conductor insulated',f1(lv.bi,2)+' × '+f1(lv.hi,2)+' mm',H.type==='round'?'Ø '+(H.d+H.ins).toFixed(2)+' mm':f1(H.w+H.ins,2)+' × '+f1(H.t+H.ins,2)+' mm'],
+    ['Conductor insulation',lv.ins+' mm',H.ins+' mm'],
+    ['No. in parallel',lv.a+' axial × '+lv.r+' radial',H.np+' axial × 1 radial'],
+    ['Cross section',f1(lv.cs,2)+' mm²',f1(H.cs,3)+' mm²'],
+    ['Current density',f1(lv.J,3)+' A/mm²',f1(hv.J,3)+' / '+f1(hv.Jmin,3)+' A/mm² (nor / min)'],
+    ['Coils / phase','1',String(hv.coils)],
+    ['Turns / coil',String(lv.N),String(hv.tpc)],
+    ['Layers',String(lv.layers),hv.layers+' per coil'],
+    ['Turns / layer',f1(lv.tpl,2),String(hv.tpl)],
+    ['Inter-layer insulation',f1(lv.IL,2)+' mm',f1(hv.IL,2)+' mm'],
+    ['Axial air ducts',lv.ducts+' × '+lv.ductT+' mm',hv.ducts+' × '+hv.ductT+' mm'],
+    ['Transposition',lv.transp+' mm','—'],
+    ['Available winding length',f0(lv.Lw)+' mm',f0(hv.Lw)+' mm (coil '+f1(hv.coilLen,1)+')'],
+    ['Wound length',f0(lv.wound)+' mm',f0(hv.wound)+' mm'],
+    ['End clearance',lv.end+' × 2 mm',hv.end+' × 2 mm'],
+    ['Radial thickness',f1(lv.rad,1)+' mm',f1(hv.rad,1)+' mm'],
+    ['ID / OD',lv.ID+' / '+lv.OD+' mm',hv.ID+' / '+hv.OD+' mm'],
+    ['Mean turn length',f1(lv.LMT,4)+' m',f1(hv.LMT,4)+' m'],
+    ['Wire length (procurement)',f0(lv.wire)+' m',f0(hv.wire)+' m'],
+    ['Resistance / phase @'+T+' °C',f1(lv.R*1000,4)+' mΩ',f1(hv.R,4)+' Ω'],
+    ['Resistance / phase @20 °C',f1(lv.R20*1000,4)+' mΩ',f1(hv.R20,4)+' Ω'],
+    ['Conductor bare / insulated',f1(lv.bare,1)+' / '+f1(lv.insW,1)+' kg',f1(hv.bare,1)+' / '+f1(hv.insW,1)+' kg'],
+    ['Procurement weight',f1(lv.proc,1)+' kg',f1(hv.proc,1)+' kg'],
+    ['Stray loss',f1(lv.stray,3)+' %',f1(hv.stray,3)+' %'],
+    ['Load loss @'+T+' °C',f0(lv.LL)+' W',f0(hv.LL)+' / '+f0(hv.LLmin)+' W (nor / min)'],
+    ['Winding gradient',f1(lv.grad,1)+' °C',f1(hv.grad,1)+' °C'],
+    ['Test voltage PF / LI',lvCls?'3 kV / —':'—',tv.pf+' kV / '+tv.li+' kVp']];
+  const perf=[['No-load loss',f0(o.loss.NLL)+' W'],['Load loss, normal tap',f0(o.loss.LL)+' W'],['Load loss, lowest tap',f0(o.loss.LLmin)+' W'],
+    ['Total loss, normal tap',f0(o.loss.total)+' W'],['Reactance ex',f1(o.imp.ex,3)+' %'],['Resistance er',f1(o.imp.er,3)+' %'],['Impedance ez',f1(o.imp.ek,3)+' %'+(p.zTarget?' (target '+p.zTarget+' %)':'')],
+    ['Ampere-turns / Ls / k_r',f0(o.imp.AT)+' / '+f1(o.imp.Ls/10,2)+' cm / '+f1(o.imp.kr,3)],['Efficiency, 100 % / 50 % load, pf 1',f1(o.loss.eff100,2)+' / '+f1(o.loss.eff50,2)+' %'],
+    ['Temperature rise limit','Class '+p.insClass+': '+f1(o.riseLim,1)+' K'+(o.riseLim<o.rise?' (altitude-derated)':'')],
+    ['Turns-ratio error (limit)',f1(o.ratio.err,3)+' % ('+f1(o.ratio.lim,3)+' %)'],['No-load current',f1(o.nl.I0,2)+' % ('+f0(o.nl.VA)+' VA)'],['Total loss at 50 % load',f0(o.loss.total50)+' W'],['Noise estimate',f1(o.noise,1)+' dB(A)'],
+    ['S.C. current (× rated)',f1(o.sc.mult,1)+' × , peak factor '+f1(o.sc.kpk,3)],['S.C. temperature LV / HV',f0(o.sc.windings[0].th1)+' / '+f0(o.sc.windings[1].th1)+' °C (limit '+o.sc.windings[0].lim+' / '+o.sc.windings[1].lim+')'],
+    ['S.C. hoop stress HV',f1(o.sc.windings[1].sigma,1)+' MPa (limit '+o.sc.windings[1].stressLim+')']];
+  const clr=[['Core to LV',p.coreLV+' mm'],['LV to HV (radial)',hv.gap+' mm'],['HV to HV (phase)',hv.phase+' mm'],['HV coil to coil',hv.coilGap+' mm'],['LV / HV end',lv.end+' / '+hv.end+' mm'],['Insulation level','Um '+o.cls.um+' kV']];
+  const wts=[['Active part L × B × H',f0(o.dims.activeL)+' × '+f0(o.dims.activeB)+' × '+f0(o.dims.activeH)+' mm'],
+    ['Enclosure L × B × H',p.enclosure?(f0(o.dims.eL)+' × '+f0(o.dims.eB)+' × '+f0(o.dims.eH)+' mm'):'—'],
+    ['Core',f0(o.wts.core)+' kg'],[lv.mat.name+' LV (insulated)',f0(o.wts.lv)+' kg'],[hv.mat.name+' HV (insulated)',f0(o.wts.hv)+' kg'],['Core clamps (est.)',f0(o.wts.clamps)+' kg'],
+    ['Insulation, leads, resin (est.)',f0(o.wts.insMisc)+' kg'],['Core-coil assembly',f0(o.wts.active)+' kg'],['Enclosure & fittings (est.)',p.enclosure?f0(o.wts.encl)+' kg':'—'],['Total mass',f0(o.wts.total)+' kg'],
+    ['Material cost (est.)','₹ '+f0(o.cost.mat)],['Others @ '+p.price.others+' %','₹ '+f0(o.cost.others)],['RM price (est.)','₹ '+f0(o.cost.total)]];
+  const taps=hv.taps.map((t,i)=>[String(i+1),(t.pct>0?'+':'')+t.pct+' %',f0(p.hvV*(1+t.pct/100))+' V',String(t.N)]);
+  const coreSteps=c.steps.map((s,i)=>[String(i+1),String(s.w),f1(s.stack,1),f0(s.net)]);
+  const S=roundGtSummary(o); const gt=gtRows(S,R_GT_ROUND).rows;
+  const values=[['kVA',p.kVA,'kVA'],['Core diameter',c.D,'mm'],['Net core area',c.Anet,'mm²'],['Flux density',c.B,'T'],['Window height',o.window,'mm'],['Leg centres',c.CD,'mm'],['LV turns',lv.N,''],['HV turns normal',hv.Nn,''],
+    ['Ratio error',o.ratio.err,'%'],['LV current density',lv.J,'A/mm²'],['HV current density (min tap)',hv.Jmin,'A/mm²'],['LV resistance @ref',lv.R,'Ω'],['HV resistance @ref',hv.R,'Ω'],['LV load loss',lv.LL,'W'],['HV load loss',hv.LL,'W'],
+    ['No-load loss',o.loss.NLL,'W'],['Load loss',o.loss.LL,'W'],['Total loss 50 %',o.loss.total50,'W'],['No-load current',o.nl.I0,'%'],['Ex',o.imp.ex,'%'],['Er',o.imp.er,'%'],['Ez',o.imp.ek,'%'],['Efficiency 100 %',o.loss.eff100,'%'],
+    ['LV rise',lv.grad,'K'],['HV rise',hv.grad,'K'],['SC temperature LV',o.sc.windings[0].th1,'°C'],['SC temperature HV',o.sc.windings[1].th1,'°C'],['Hoop stress HV',o.sc.windings[1].sigma,'MPa'],['Noise estimate',o.noise,'dB(A)'],
+    ['Core mass',o.wts.core,'kg'],['Total mass',o.wts.total,'kg'],['RM price (est.)',o.cost.total,'Rs']];
+  return {title,core,wind,perf,clr,wts,taps,coreSteps,steps:o.steps,warn:o.warn,checks:o.checks,gt,values};
+}
+
+function tbl(rows,head){ return '<table>'+(head?'<tr>'+head.map(h=>'<th>'+h+'</th>').join('')+'</tr>':'')+rows.map(r=>'<tr>'+r.map((c,i)=>i===0?'<th>'+esc(c)+'</th>':'<td>'+esc(c)+'</td>').join('')+'</tr>').join('')+'</table>'; }
+function esc(s){ return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+function renderSheet(M){
+  const t=M.title;
+  $('#sheet').innerHTML='<div class="titleblock"><div class="big">'+esc(t.title)+'</div>'+t.cells.map(c=>'<div><span>'+c[0]+'</span>'+esc(c[1])+'</div>').join('')+'</div>'+
+  '<div class="cols"><div><h3>Winding data</h3>'+tbl(M.wind,['Parameter','LV (inner)','HV (outer)'])+'</div><div>'+
+  '<h3>Core data</h3>'+tbl(M.core)+'<h3>Performance</h3>'+tbl(M.perf)+'<h3>Clearances</h3>'+tbl(M.clr)+'<h3>Dimensions and bill of mass</h3>'+tbl(M.wts)+
+  '<h3>HV tapping</h3>'+tbl(M.taps,['Tap','Setting','HV volts','Turns'])+'<h3>Core steps</h3>'+tbl(M.coreSteps,['Step','Width, mm','Stack, mm','Net area, mm²'])+'</div></div>';
+  const grp={1:'Volts per turn',4:'Core',7:'LV winding',26:'HV winding',41:'Core weight and loss',43:'Impedance, enclosure and weights'};
+  $('#steps').innerHTML='<table><tr><th>Step</th><th>Item</th><th>Working</th><th>Result</th></tr>'+M.steps.map(s=>(grp[s.n]?'<tr class="grp"><td colspan="4">'+grp[s.n]+'</td></tr>':'')+
+    '<tr><td>'+s.n+'</td><td>'+esc(s.title)+'</td><td class="formula">'+esc(s.formula)+(s.note?'<span class="note">'+esc(s.note)+'</span>':'')+'</td><td class="r">'+esc(s.result)+'</td></tr>').join('')+'</table>';
+}
+function renderKpis(o){
+  const p=o.inp; const zbad=p.zTarget&&Math.abs(o.imp.ek-p.zTarget)/p.zTarget>0.1;
+  const k=[['Core diameter',o.core.D,'mm'],['Flux density',f1(o.core.B,3),'T',o.core.B>1.7],['No-load loss',f0(o.loss.NLL),'W'],['Load loss @'+p.refTemp+' °C',f0(o.loss.LL),'W'],
+    ['Impedance',f1(o.imp.ek,2),'%',zbad],['LV / HV gradient',f1(o.lv.grad,0)+' / '+f1(o.hv.grad,0),'°C',Math.max(o.lv.grad,o.hv.grad)>o.rise],['Efficiency',f1(o.loss.eff100,2),'%'],['Total mass',f0(o.wts.total),'kg']];
+  $('#kpis').innerHTML=k.map(x=>'<div class="kpi'+(x[3]?' bad':'')+'"><span>'+x[0]+'</span><strong>'+x[1]+'</strong><em>'+x[2]+'</em></div>').join('');
+  const w=$('#warns'); w.classList.toggle('on',o.warn.length>0); $('ul',w).innerHTML=o.warn.map(x=>'<li>'+esc(x)+'</li>').join('');
+  $('#okline').classList.toggle('on',o.warn.length===0);
+}
+// Round core: A) plan section through the windings of all three limbs, showing the stepped core;
+// B) section through one limb along its axis, showing LV layers, HV coils and ducts. Everything to scale in mm.
+function roundDrawing(o,print){ const P=drwPal(print), c=o.core, lv=o.lv, hv=o.hv, Hw=o.window, yoke=c.yoke, CD=c.CD;
+  const planL=2*CD+hv.OD, Z=2*yoke+Hw; const width=Math.max(planL,Z); const fs=Math.max(11,width/58), sw=fs*0.07;
+  const mL=fs*6.5, W_=width+mL+fs*7;
+  // ---- A: plan
+  const aT=fs*8.4, pcy=aT+hv.OD/2, x0=mL+(width-planL)/2+hv.OD/2;
+  let s='';
+  s+=DRW.text(mL,fs*1.4,'A  Plan: section through the windings (to scale, mm)',P,fs*1.05,{anchor:'start',weight:600});
+  const circ=(cx,r,fill,edge)=>'<circle cx="'+DRW.n(cx)+'" cy="'+DRW.n(pcy)+'" r="'+DRW.n(r)+'" fill="'+fill+'" stroke="'+edge+'" stroke-width="'+DRW.n(sw)+'"/>';
+  for(let i=0;i<3;i++){ const cx=x0+i*CD;
+    s+=circ(cx,hv.OD/2,P.hv,P.hvEdge)+circ(cx,hv.ID/2,P.bg,P.coreEdge)+circ(cx,lv.OD/2,P.lv,P.lvEdge)+circ(cx,lv.ID/2,P.bg,P.coreEdge);
+    // stepped core: filled steps plus one staircase outline
+    let prev=0; const pts=[]; for(const st of c.steps){ const y=prev+st.stack/2; s+=DRW.rect(cx-st.w/2,pcy-y,st.w,2*y,P.core,'none',0); pts.push([st.w/2,prev],[st.w/2,y]); prev=y; }
+    const q=[...pts, ...pts.slice().reverse().map(([x,y])=>[-x,y]), ...pts.map(([x,y])=>[-x,-y]), ...pts.slice().reverse().map(([x,y])=>[x,-y])];
+    s+='<path d="M'+q.map(([x,y])=>DRW.n(cx+x)+' '+DRW.n(pcy+y)).join(' L')+' Z" fill="none" stroke="'+P.coreEdge+'" stroke-width="'+DRW.n(sw)+'"/>';
+    s+=DRW.line(cx,pcy-hv.OD/2-fs*1.2,cx,pcy+hv.OD/2+fs*0.8,P.sub,sw*0.8,' stroke-dasharray="'+DRW.n(fs*1.2)+' '+DRW.n(fs*0.35)+' '+DRW.n(fs*0.2)+' '+DRW.n(fs*0.35)+'"'); }
+  s+=DRW.dimH(x0-hv.OD/2,x0+2*CD+hv.OD/2,aT-fs*4.1,'Active part length '+DRW.f(planL),P,fs,pcy,pcy);
+  s+=DRW.dimH(x0,x0+CD,aT-fs*1.7,'Centres '+DRW.f(CD),P,fs)+DRW.dimH(x0+CD,x0+2*CD,aT-fs*1.7,DRW.f(CD),P,fs);
+  const ab=pcy+hv.OD/2; const cx2=x0+2*CD;
+  s+=DRW.dimH(cx2-hv.OD/2,cx2+hv.OD/2,ab+fs*2,'HV OD '+DRW.f(hv.OD),P,fs,pcy,pcy);
+  s+=DRW.dimH(x0-c.D/2,x0+c.D/2,ab+fs*2,'Core Ø'+c.D+', '+c.steps.length+' steps',P,fs,pcy,pcy);
+  // ---- B: limb section
+  const bT=ab+fs*8.2, Rmax=hv.OD/2+fs*1.5, cy=bT+Rmax, xs=mL+(width-Z)/2;
+  s+=DRW.text(mL,bT-fs*2.6,'B  Section through one limb along its axis',P,fs*1.05,{anchor:'start',weight:600});
+  s+=DRW.rect(xs,cy-Rmax,yoke,2*Rmax,P.core,P.coreEdge,sw)+DRW.rect(xs+yoke+Hw,cy-Rmax,yoke,2*Rmax,P.core,P.coreEdge,sw)+DRW.rect(xs,cy-c.D/2,Z,c.D,P.core,P.coreEdge,sw);
+  const lvL=Hw-2*lv.end, lx=xs+yoke+lv.end;
+  for(const sg of [-1,1]){ const yLV=sg<0?cy-lv.OD/2:cy+lv.ID/2;
+    s+=DRW.band(lx,yLV,lvL,lv.rad,lv.layers,lv.ducts,lv.ductT,P.lv,P.lvEdge,P,sw,true);
+    const yHV=sg<0?cy-hv.OD/2:cy+hv.ID/2;
+    for(let k=0;k<hv.coils;k++){ const z0=xs+yoke+hv.end+k*(hv.coilLen+hv.coilGap); s+=DRW.band(z0,yHV,hv.coilLen,hv.rad,hv.layers,hv.ducts,hv.ductT,P.hv,P.hvEdge,P,sw,true); } }
+  s+=DRW.line(xs-fs,cy,xs+Z+fs,cy,P.sub,sw*0.8,' stroke-dasharray="'+DRW.n(fs*1.2)+' '+DRW.n(fs*0.35)+' '+DRW.n(fs*0.2)+' '+DRW.n(fs*0.35)+'"');
+  s+=DRW.dimH(xs+yoke,xs+yoke+Hw,cy-Rmax-fs*1.6,'Window '+DRW.f(Hw),P,fs,cy-Rmax,cy-Rmax);
+  const hvL=hv.coils*hv.coilLen+(hv.coils-1)*hv.coilGap, hx=xs+yoke+hv.end;
+  s+=DRW.dimH(lx,lx+lvL,cy+Rmax+fs*1.8,'LV winding '+DRW.f(lvL),P,fs,cy+lv.OD/2,cy+lv.OD/2);
+  s+=DRW.dimH(hx,hx+hvL,cy+Rmax+fs*4.2,'HV '+hv.coils+' coil'+(hv.coils>1?'s':'')+', '+DRW.f(hvL),P,fs,cy+hv.OD/2,cy+hv.OD/2);
+  const xr=xs+Z+fs*1.6; s+=DRW.dimV(cy-c.D/2,cy+c.D/2,xr,'Ø'+c.D,P,fs,xs+Z,xs+Z,'right');
+  s+=DRW.dimV(cy-hv.OD/2,cy+hv.OD/2,xr+fs*2.6,'HV OD '+DRW.f(hv.OD),P,fs,xs+yoke+Hw,xs+yoke+Hw,'right');
+  const yN=cy+Rmax+fs*6.6; const notes=['Radial build, mm: core Ø'+c.D+', LV ID/OD '+lv.ID+' / '+lv.OD+' ('+DRW.f(lv.rad)+' radial, '+lv.layers+' layers'+(lv.ducts?', '+lv.ducts+' × '+lv.ductT+' duct':'')+'), LV–HV gap '+hv.gap+', HV ID/OD '+hv.ID+' / '+hv.OD+' ('+DRW.f(hv.rad)+' radial, '+hv.layers+' layers per coil'+(hv.ducts?', '+hv.ducts+' × '+hv.ductT+' duct':'')+')',
+    'End clearance LV '+lv.end+' × 2, HV '+hv.end+' × 2, coil gap '+hv.coilGap+'; phase gap '+hv.phase+'; yoke height ≈ '+yoke];
+  notes.forEach((t,i)=>{ s+=DRW.text(mL,yN+i*fs*1.35,t,P,fs*0.9,{anchor:'start',fill:i?P.sub:P.ink}); });
+  const H_=yN+fs*2.6+fs*1.5; let lxx=mL; const yl=H_-fs*0.9;
+  const leg=(fill,edge,label)=>{ const r=DRW.rect(lxx,yl-fs*0.8,fs*1.1,fs*0.9,fill,edge,sw)+DRW.text(lxx+fs*1.5,yl,label,P,fs*0.9,{anchor:'start'}); lxx+=fs*1.5+label.length*fs*0.5+fs*1.6; return r; };
+  s+=leg(P.core,P.coreEdge,'Core '+o.inp.grade)+leg(P.lv,P.lvEdge,'LV '+lv.N+' turns')+leg(P.hv,P.hvEdge,'HV '+hv.Nn+' turns (normal tap)');
+  return DRW.svgOpen(W_,H_+fs*0.6,P,fs,'Round core: plan through the windings and section through one limb, dimensioned in millimetres')+s+'</svg>'; }
+function renderSVG(o){ $('#svgwrap').innerHTML=roundDrawing(o,false); }
+function run(){
+  if(!form.kVA.value||!form.hvV.value||!form.lvV.value){ return; }
+  try{ const {p,meta}=readInputs(); const o=designAuto(p); const M=buildModel(o,meta); CUR={o,M,meta}; renderKpis(o); renderSheet(M); renderSVG(o); renderChecks(o,M);
+    $('#fixRound').hidden=!(o.auto&&(o.auto.window||o.auto.layers||o.auto.lvDucts||o.auto.hvDucts)); }
+  catch(e){ console.error(e); $('#warns').classList.add('on'); $('#warns ul').innerHTML='<li>These inputs cannot be designed: '+esc(e.message)+'. Check the voltages and advanced fields.</li>'; }
+}
+// Checks and tests tab (round core)
+let R_GT_ROUND=gtDefaults();
+function roundGtSummary(o){ const p=o.inp; return {NLL:o.loss.NLL,LL:o.loss.LL,Z:o.imp.ek,I0:o.nl.I0,ratio:o.ratio.err,R1:o.lv.R,R2:o.hv.R,T:p.refTemp,rise1:o.lv.grad,rise2:o.hv.grad,noise:o.noise,mat1:p.lvMat,mat2:p.hvMat,
+  names:['LV','HV'],riseLim:o.riseLim,noiseMax:p.noiseMax,zTarget:p.zTarget,zWindow:null}; }
+function renderChecks(o,M){ const el=$('#checks');
+  el.innerHTML='<h3>Design checks</h3><div class="tblwrap"><table><tr><th>Check</th><th>Requirement</th><th>Obtained</th><th>Result</th></tr>'+o.checks.map(c=>'<tr><td>'+esc(c.name)+'</td><td>'+esc(c.req)+'</td><td>'+esc(c.got)+'</td><td style="font-weight:600;color:'+(c.ok?'#2E7D4F':'#B23A2E')+'">'+(c.ok?'Pass':'Fail')+'</td></tr>').join('')+'</table></div><div id="checksGt"></div>';
+  gtRender($('#checksGt'),roundGtSummary(o),R_GT_ROUND,()=>{ CUR.M=buildModel(CUR.o,CUR.meta); renderChecks(CUR.o,CUR.M); },(c)=>{
+    const set=(k,v)=>{ if(form.elements[k]) form.elements[k].value=v; }; const cur=k=>{ const x=parseFloat(form.elements[k]&&form.elements[k].value); return isNaN(x)?null:x; };
+    if(c.key==='riseCal1') set('riseCal1',((cur('riseCal1')??1)*c.mult).toFixed(3)); else if(c.key==='riseCal2') set('riseCal2',((cur('riseCal2')??1)*c.mult).toFixed(3));
+    else { toast('For the round core, apply this factor to the core-loss table or conductivity in the code (see README).'); return; }
+    toast('Calibration applied.'); run(); }); }
+$('#fixRound').addEventListener('click',()=>{ if(!CUR) return; const o=CUR.o; const set=(k,v)=>{ if(form.elements[k]) form.elements[k].value=v; };
+  set('window',o.window); set('lvLayers',o.lv.layers); set('lvDucts',o.lv.ducts); set('hvDucts',o.hv.ducts); set('lvAx',o.lv.a); set('lvRad',o.lv.r); set('hvCoils',o.hv.coils); set('coreDia',o.core.D);
+  $('#adv').open=true; toast('Automatic values copied into the Advanced fields.'); run(); });
+// tabs
+$$('#layout-round .tabs button').forEach(b=>b.addEventListener('click',()=>{ $$('#layout-round .tabs button').forEach(x=>x.setAttribute('aria-selected',x===b)); for(const t of ['sheet','checks','steps']) $('#tab-'+t).hidden=b.dataset.tab!==t; }));
+$$('[data-preset]').forEach(b=>b.addEventListener('click',()=>loadPreset(b.dataset.preset)));
+function toast(t){ const el=$('#toast'); el.textContent=t; el.classList.add('on'); setTimeout(()=>el.classList.remove('on'),2600); }
+const dlP=(window.claude&&window.claude.use)?window.claude.use('downloads').catch(()=>null):Promise.resolve(null);
+async function saveFile(name,blob){
+  const dl=await Promise.race([dlP,new Promise(r=>setTimeout(()=>r(undefined),1500))]);
+  if(dl){ try{ await dl.save({filename:name,data:blob}); toast('Saved '+name); }catch(e){ if(e&&e.code==='declined') return; toast('Could not save the file ('+(e&&e.code||'error')+').'); } return; }
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1000); toast('Downloaded '+name);
+}
+// File names: {work order or party}_{RECT|ROUND}_{kVA}kVA_{HV}-{LV}V_{rev}_{date}.{ext}
+function designFileName(ref,kind,kVA,hv,lv,rev,ext){ const clean=s=>String(s||'').trim().replace(/[^A-Za-z0-9._-]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40);
+  const parts=[clean(ref),kind,kVA+'kVA',hv+'-'+lv+'V',clean(rev)||'R0',new Date().toISOString().slice(0,10)].filter(Boolean); return parts.join('_')+'.'+ext; }
+function fname(ext){ const p=CUR.o.inp, m=CUR.meta; return designFileName(m.wo||m.party,'ROUND',p.kVA,p.hvV,p.lvV,m.rev,ext); }
+function pdfText(s){ return String(s).replace(/−/g,'-').replace(/δ/g,'delta').replace(/′/g,"'").replace(/₹/g,'Rs').replace(/■/g,'').replace(/Ω/g,'Ohm').replace(/Ø/g,'dia ').replace(/≈/g,'~').replace(/√/g,'sqrt').replace(/×/g,'x').replace(/÷/g,'/').replace(/²/g,'2').replace(/⁴/g,'^4').replace(/⁻⁶/g,'^-6').replace(/⁻³/g,'^-3').replace(/⁻¹/g,'^-1').replace(/·/g,'.').replace(/–|—/g,'-').replace(/₇₅/g,'75').replace(/°/g,' deg ').replace(/ deg C/g,' degC').replace(/ρ/g,'rho').replace(/π/g,'pi').replace(/ⁱ/g,'').replace(/[^\x00-\xFF]/g,''); }
+// PDF layout helper: draw a section on a fresh page with several font sizes and keep the one that needs the fewest pages
+// (largest font on a tie), so no table leaves a few orphan rows on an extra page.
+function pdfFit(d,draw,fonts){ fonts=fonts||[7,6.5,6,5.6,5.3]; const start=d.getNumberOfPages(); let best=null;
+  for(const fs of fonts){ draw(fs); const used=d.getNumberOfPages()-start+1; if(!best||used<best.used) best={fs,used};
+    for(let i=d.getNumberOfPages();i>=start;i--) d.deletePage(i); d.addPage(); if(best.used===1) break; }
+  draw(best.fs); return best; }
+// Page 1 must be one page: rebuild the document with smaller fonts until it fits.
+function pdfFirstPage(make,fonts){ fonts=fonts||[6.4,6,5.6,5.3]; let d=null;
+  for(const fs of fonts){ d=make(fs); if(d.getNumberOfPages()===1) return d; } return d; }
+$('#dlPdf').addEventListener('click',async()=>{
+  if(!CUR) return; if(!window.jspdf){ toast('PDF library did not load. Check your connection and reload.'); return; }
+  const png=await svgToPng(roundDrawing(CUR.o,true),2800);
+  const {jsPDF}=window.jspdf; const M=CUR.M; const P=v=>v.map(r=>r.map(pdfText));
+  const ink=[23,33,43], head=[228,233,238];
+  const B=(fs)=>({theme:'grid',styles:{fontSize:fs,cellPadding:fs*0.1,lineColor:[150,160,170],lineWidth:0.15,textColor:ink},headStyles:{fillColor:head,textColor:ink,fontStyle:'bold'},columnStyles:{0:{fontStyle:'bold'}}});
+  const pass=(h,col)=>{ if(h.section==='body'&&h.column.index===col) h.cell.styles.textColor=h.cell.raw==='Pass'?[46,125,79]:[178,58,46]; };
+  const title=(d,t)=>{ d.setTextColor(...ink); d.setFont('helvetica','bold'); d.setFontSize(11); d.text(pdfText(t),8,12); };
+  // page 1: title block, winding data, core, performance, dimensions
+  const d=pdfFirstPage((fs)=>{ const d=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+    d.setDrawColor(...ink); d.setLineWidth(0.5); d.rect(8,8,281,27); d.setFont('helvetica','bold'); d.setFontSize(11); d.setTextColor(...ink); d.text(pdfText(M.title.title),10,13);
+    d.setFont('helvetica','normal'); d.setFontSize(6.4); M.title.cells.forEach((c,i)=>{ const x=10+(i%6)*46.5, y=18+Math.floor(i/6)*5.6; d.setTextColor(90); d.text(pdfText(c[0]),x,y); d.setTextColor(...ink); d.text(pdfText(c[1]).slice(0,40),x,y+2.6); });
+    d.autoTable({...B(fs),startY:38,margin:{left:8,right:150,bottom:9},head:[['Winding data','LV (inner)','HV (outer)']],body:P(M.wind),columnStyles:{0:{fontStyle:'bold',cellWidth:38}}});
+    let y=38; const sec=(h,body)=>{ d.autoTable({...B(fs),startY:y,margin:{left:152,right:8,bottom:9},head:[[h,'']],body:P(body)}); y=d.lastAutoTable.finalY+1; };
+    sec('Core data',M.core); sec('Performance',M.perf); sec('Dimensions and bill of mass',M.wts); return d; });
+  pdfDrawingPage(d,png,'General arrangement (to scale, dimensions in mm)',['A: plan section through the windings of all three limbs, with the stepped core. B: section through one limb along its axis, with LV layers, HV coils and ducts.']);
+  // page 2: checks and guarantees
+  d.addPage(); pdfFit(d,(fs)=>{ title(d,'Design checks');
+    d.autoTable({...B(fs),startY:15,margin:{left:8,right:8,bottom:9},head:[['Check','Requirement','Obtained','Result']],body:P(M.checks.map(c=>[c.name,c.req,c.got,c.ok?'Pass':'Fail'])),didParseCell:h=>pass(h,3)});
+    d.setFont('helvetica','bold'); d.setFontSize(11); d.text('Guarantees and factory test results',8,d.lastAutoTable.finalY+8);
+    d.autoTable({...B(fs),startY:d.lastAutoTable.finalY+11,margin:{left:8,right:8,bottom:9},head:[['Item','Calculated','Guaranteed','Limit at test (IEC 60076-1)','Measured (FAT)','Result']],body:P(M.gt.map(r=>[r.item,r.calc,r.noG?'-':String(r.g),r.max,r.meas==null?'':String(r.meas),r.result])),didParseCell:h=>pass(h,5)}); });
+  // page 3+: steps, then core steps, taps and clearances
+  d.addPage(); pdfFit(d,(fs)=>{ title(d,'Step-by-step calculation');
+    d.autoTable({...B(fs),startY:15,margin:{left:8,right:8,bottom:9},head:[['Step','Item','Working','Result']],body:M.steps.map(s=>[String(s.n),pdfText(s.title),pdfText(s.formula+(s.note?'  ['+s.note+']':'')),pdfText(s.result)]),
+      columnStyles:{0:{cellWidth:9,halign:'center'},1:{cellWidth:40,fontStyle:'bold'},3:{cellWidth:58,fontStyle:'bold'}}});
+    let y=d.lastAutoTable.finalY+3; if(y>150){ d.addPage(); y=12; }
+    d.autoTable({...B(fs),startY:y,margin:{left:8,right:200,bottom:9},head:[['Step','Width, mm','Stack, mm','Net mm2']],body:M.coreSteps});
+    d.autoTable({...B(fs),startY:y,margin:{left:102,right:120,bottom:9},head:[['Tap','Setting','HV volts','Turns']],body:P(M.taps)});
+    d.autoTable({...B(fs),startY:y,margin:{left:182,right:8,bottom:9},head:[['Clearances','']],body:P(M.clr)}); },[6.8,6.3,5.8,5.4]);
+  const n=d.getNumberOfPages(); for(let i=1;i<=n;i++){ d.setPage(i); d.setFontSize(6); d.setTextColor(90); d.text(pdfText('Round core design, '+CUR.o.inp.kVA+' kVA  |  Rev '+(CUR.meta.rev||'R0')+'  |  Tool '+APP_VERSION+'  |  Estimated values marked (est.)  |  Page '+i+' of '+n+'  |  Generated '+new Date().toLocaleString('en-GB')),8,205); }
+  saveFile(fname('pdf'),d.output('blob'));
+});
+$('#dlXlsx').addEventListener('click',()=>{
+  if(!CUR) return; if(!window.XLSX){ toast('Excel library did not load. Check your connection and reload.'); return; }
+  const M=CUR.M, wb=XLSX.utils.book_new();
+  const a=[[M.title.title],[],...M.title.cells,[],['WINDING DATA','LV (inner)','HV (outer)'],...M.wind,[],['CORE DATA'],...M.core,[],['PERFORMANCE'],...M.perf,[],['CLEARANCES'],...M.clr,[],['DIMENSIONS AND BILL OF MASS'],...M.wts];
+  const ws=XLSX.utils.aoa_to_sheet(a); ws['!cols']=[{wch:34},{wch:30},{wch:40}]; XLSX.utils.book_append_sheet(wb,ws,'Design sheet');
+  const ws2=XLSX.utils.aoa_to_sheet([['Step','Item','Working','Result','Note'],...M.steps.map(s=>[s.n,s.title,s.formula,s.result,s.note||''])]); ws2['!cols']=[{wch:6},{wch:30},{wch:90},{wch:40},{wch:40}]; XLSX.utils.book_append_sheet(wb,ws2,'Step-by-step');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Step','Width mm','Stack mm','Net area mm2'],...M.coreSteps]),'Core steps');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Tap','Setting','HV volts','Turns'],...M.taps]),'Taps');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Check','Requirement','Obtained','Result'],...M.checks.map(c=>[c.name,c.req,c.got,c.ok?'Pass':'Fail'])]),'Checks');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Quantity','Value','Unit'],...M.values.map(r=>[r[0],typeof r[1]==='number'?Math.round(r[1]*1e6)/1e6:r[1],r[2]])]),'Values');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Item','Calculated','Guaranteed','Limit at test','Measured','Result'],...M.gt.map(r=>[r.item,isNaN(+r.calc)?r.calc:+r.calc,r.noG?'':r.g,r.max,r.meas??'',r.result])]),'Guarantees & tests');
+  const inp=[['Field','Value']]; for(const el of form.elements){ if(el.name) inp.push([el.name,el.value]); } XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(inp),'Inputs');
+  const out=XLSX.write(wb,{bookType:'xlsx',type:'array'}); saveFile(fname('xlsx'),new Blob([out]));
+});
+loadPreset('p500');
+</script>
+</body>
+</html>

@@ -1,21 +1,24 @@
-# 1) test: re-runs the reference designs (70 kVA CAL1, 500 kVA method, 600 kVA sheet).
-# 2) pages: publishes index.html only if the test passed, on the default branch.
-stages: [test, deploy]
-
+# 1) check:  index.html must match the sources in src/ (run  python tools/build.py  before committing)
+# 2) test:   re-run the reference designs (70 kVA CAL1, 500 kVA method, 600 kVA sheet)
+# 3) pages:  publish index.html, only on the default branch and only if 1 and 2 passed
+stages: [check, test, deploy]
+build-check:
+  stage: check
+  image: node:20
+  script:
+    - python3 tools/build.py --check
 regression:
   stage: test
-  image: node:20-alpine
+  image: node:20
   script:
     - node tests/regression.js
-
 pages:
   stage: deploy
-  needs: [regression]
+  needs: [build-check, regression]
   script:
     - mkdir -p public
     - cp index.html public/
   artifacts:
-    paths:
-      - public
+    paths: [public]
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

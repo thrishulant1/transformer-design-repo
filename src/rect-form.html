@@ -1,0 +1,163 @@
+<div class="layout" id="layout-rect">
+<aside class="form">
+  <div class="presets" aria-label="Load a reference design">
+    <button class="btn sm" data-rpreset="sheet70">Your 70 kVA sheet</button>
+    <button class="btn sm" data-rpreset="auto70">70 kVA auto design</button>
+    <label class="btn sm filebtn wide">Import requirement sheet (.xlsx)<input type="file" id="reqFile" accept=".xlsx,.xls,.csv" hidden></label>
+  </div>
+  <div class="saved" aria-label="Saved designs">
+    <p class="subhead">Saved designs <span class="libmode" id="libMode">This browser only</span></p>
+    <div class="saverow"><input id="saveName" placeholder="Name, e.g. 8 kVA round wire" aria-label="Design name"><button type="button" class="btn sm primary" id="saveBtn">Save</button></div>
+    <div class="saverow three"><select id="savedList" aria-label="Saved designs"><option value="">No saved designs yet</option></select><button type="button" class="btn sm" id="loadBtn">Load</button><button type="button" class="btn sm" id="delBtn">Delete</button></div>
+    <div class="saverow two"><button type="button" class="btn sm" id="expBtn">Export (.json)</button><label class="btn sm filebtn">Load file (.json / Excel)<input type="file" id="impFile" accept=".json,.xlsx" hidden></label></div>
+    <div class="saverow one"><button type="button" class="btn sm" id="pushLocal" hidden>Copy this browser's designs to the shared library</button></div>
+  </div>
+  <p class="hint" id="reqStatus">Requirement: TRX 70 kVA, 433 V / 400 V, Al, Dyn11 (built in).</p>
+<form id="rf" autocomplete="off" onsubmit="return false">
+  <details class="sec" open>
+    <summary>Requirement <small><span class="req">*</span> from the requirement sheet</small></summary>
+    <div class="grid2">
+      <label><b>Rating, kVA <span class="req">*</span></b><input name="kVA" type="number" step="any" min="1"></label>
+      <label><b>Frequency, Hz <span class="req">*</span></b><select name="freq"><option>50</option><option>60</option></select></label>
+      <label><b>Primary voltage, V <span class="req">*</span></b><input name="priV" type="number" step="any"></label>
+      <label><b>Secondary voltage, V <span class="req">*</span></b><input name="secV" type="number" step="any"></label>
+      <label><b>Vector group <span class="req">*</span></b><select name="vg"><option>Dyn11</option><option>Dyn1</option><option>Dyn5</option><option>Yyn0</option><option>Ynd11</option><option>Yd11</option><option>Dd0</option></select></label>
+      <label><b>Winding material <span class="req">*</span></b><select name="mat"><option value="Al">Aluminium</option><option value="Cu">Copper</option></select></label>
+      <label><b>Impedance, % <span class="req">*</span></b><input name="zTarget" type="number" step="0.01"></label>
+      <label><b>Tolerance +% / −%</b><span class="pair"><input name="zTolPlus" type="number" step="0.5" aria-label="plus tolerance"><input name="zTolMinus" type="number" step="0.5" aria-label="minus tolerance"></span></label>
+      <label><b>Efficiency above, % <span class="req">*</span></b><input name="effMin" type="number" step="0.1"></label>
+      <label><b>Rise limit, K <span class="req">*</span></b><input name="riseLimit" type="number" step="1"></label>
+      <label><b>Ambient, °C</b><input name="amb" type="number" step="1"></label>
+      <label><b>Loss reference, °C</b><select name="windTemp"><option>115</option><option>90</option><option>75</option><option>120</option><option>145</option></select></label>
+      <label><b>Insulation class</b><select name="insClass"><option>H</option><option>F</option><option>B</option></select></label>
+      <label><b>Core grade</b><select name="grade"><option value="M4-27">CRGO M4 0.27</option><option value="MOH-23">CRGO MOH 0.23</option><option value="CRNO-35">CRNO 0.35</option></select></label>
+      <label><b>Noise max, dB</b><input name="noiseMax" type="number" step="1"></label>
+      <label><b>Enclosure</b><select name="enclosure"><option value="0">Not required</option><option value="1">CRCA enclosure</option></select></label>
+    </div>
+  </details>
+  <details class="sec">
+    <summary>Site, short circuit and classes</summary>
+    <div class="grid2">
+      <label><b>Altitude, m</b><input name="altitude" type="number" step="100" min="0"></label>
+      <label><b>Load K-factor</b><input name="kFactor" type="number" step="1" min="1" title="1 = linear loads; K-4, K-13 for non-linear loads"></label>
+      <label><b>System fault level, MVA</b><input name="faultMVA" type="number" step="any" min="0" placeholder="infinite bus"></label>
+      <label><b>Short-circuit duration, s</b><input name="scTime" type="number" step="0.5" min="0.25"></label>
+      <label class="full"><b>Short-circuit withstand in auto design</b><select name="scRequired"><option value="0">Check and report only</option><option value="1">Required: auto design must pass (lowers current density)</option></select></label>
+      <label><b>Environmental / climatic</b><span class="pair"><select name="envClass" aria-label="Environmental class"><option>E0</option><option>E1</option><option selected>E2</option></select><select name="climClass" aria-label="Climatic class"><option>C1</option><option selected>C2</option></select></span></label>
+      <label><b>Fire behaviour</b><select name="fireClass"><option>F0</option><option selected>F1</option></select></label>
+    </div>
+  </details>
+  <details class="sec" open>
+    <summary>Design <small>blank = chosen automatically</small></summary>
+    <div class="grid2">
+      <label class="full"><b>Calculation basis</b><select name="basis"><option value="sheet">As per design sheet (matches CAL1)</option><option value="refined">Refined (revised V/t, interpolated tables, full stray formula)</option></select></label>
+      <label><b>Constant K</b><input name="K" type="number" step="0.5" placeholder="auto"></label>
+      <label><b>Flux density, T</b><input name="B" type="number" step="0.01" placeholder="auto"></label>
+      <label><b>Core width W, mm</b><input name="W" type="number" placeholder="auto"></label>
+      <label><b>Core build D, mm</b><input name="D" type="number" placeholder="auto"></label>
+      <label><b>Inner turns / limb</b><input name="N1" type="number" placeholder="from V/t"></label>
+      <label><b>Outer turns / limb</b><input name="N2" type="number" placeholder="from V/t"></label>
+      <label><b>Inner layers</b><input name="lvLayers" type="number" placeholder="auto"></label>
+      <label><b>Outer layers</b><input name="hvLayers" type="number" placeholder="auto"></label>
+      <label><b>Inner J target, A/mm²</b><input name="J1" type="number" step="0.05" placeholder="auto"></label>
+      <label><b>Outer J target, A/mm²</b><input name="J2" type="number" step="0.05" placeholder="auto"></label>
+    </div>
+    <p class="subhead">Inner winding conductor (b axial × h radial)</p>
+    <div class="grid4">
+      <label><b>Type</b><select name="lvType"><option value="strip">Strip</option><option value="round">Round</option></select></label>
+      <label><b>b / Ø</b><input name="lvB" type="number" step="0.05" placeholder="auto"></label>
+      <label><b>h</b><input name="lvH" type="number" step="0.05" placeholder="auto"></label>
+      <label><b>Rad × Ax</b><span class="pair"><input name="lvRad" type="number" placeholder="–" aria-label="radial parallels"><input name="lvAx" type="number" placeholder="–" aria-label="axial parallels"></span></label>
+    </div>
+    <p class="subhead">Outer winding conductor</p>
+    <div class="grid4">
+      <label><b>Type</b><select name="hvType"><option value="strip">Strip</option><option value="round">Round</option></select></label>
+      <label><b>b / Ø</b><input name="hvB" type="number" step="0.05" placeholder="auto"></label>
+      <label><b>h</b><input name="hvH" type="number" step="0.05" placeholder="auto"></label>
+      <label><b>Rad × Ax</b><span class="pair"><input name="hvRad" type="number" placeholder="–" aria-label="radial parallels"><input name="hvAx" type="number" placeholder="–" aria-label="axial parallels"></span></label>
+    </div>
+    <p class="hint" id="rAutoNote"></p>
+    <button type="button" class="btn sm" id="rFix" hidden>Copy the automatic values into the fields</button>
+  </details>
+  <details class="sec">
+    <summary>Clearances, insulation and factors</summary>
+    <div class="grid2">
+      <label><b>Bobbin gap (total), mm</b><input name="gap" type="number" step="0.5"></label>
+      <label><b>Inner–outer gap δ (total), mm</b><input name="delta" type="number" step="0.5"></label>
+      <label><b>Coil-to-coil am, mm</b><input name="am" type="number" step="0.5"></label>
+      <label><b>Limb plate on D, mm</b><input name="plateD" type="number" step="0.5"></label>
+      <label><b>Inner end clearance (total), mm</b><input name="lvEnd" type="number"></label>
+      <label><b>Outer min. end clearance, mm</b><input name="hvEndMin" type="number"></label>
+      <label><b>Inner radial ducts</b><input name="lvDucts" type="number" placeholder="auto"></label>
+      <label><b>Outer radial ducts</b><input name="hvDucts" type="number" placeholder="auto"></label>
+      <label><b>Duct width, mm</b><input name="ductW" type="number" step="0.5"></label>
+      <label><b>Conductor insulation, mm</b><input name="ins" type="number" step="0.01"></label>
+      <label><b>Inter-layer insulation, mm</b><input name="il" type="number" step="0.01"></label>
+      <label><b>Extra turn per layer (axial length)</b><input name="extraTurn" type="number" step="0.5" min="0"></label>
+      <label class="full"><b>Conductor conductivity</b><select name="condBasis"><option value="standard">Standard: Cu 100 % IACS, Al 61 % IACS (IEC 60028)</option><option value="sheet">Design sheet: Cu 42.76, Al 26.73 m/Ω·mm² @115 °C</option><option value="custom">Supplier certificate (enter value)</option></select></label>
+      <label><b>Conductivity @ ref. temp, m/Ω·mm²</b><input name="sigmaCustom" type="number" step="0.01" placeholder="for supplier option"></label>
+      <label><b>Rise calibration inner / outer</b><span class="pair"><input name="riseCal1" type="number" step="0.01" aria-label="inner rise calibration"><input name="riseCal2" type="number" step="0.01" aria-label="outer rise calibration"></span></label>
+      <label><b>Noise constant A / B-slope</b><span class="pair"><input name="noiseA" type="number" step="0.5" aria-label="noise constant"><input name="noiseB" type="number" step="1" aria-label="noise slope"></span></label>
+      <label><b>Hoop stress limit Cu / Al, MPa</b><span class="pair"><input name="stressCu" type="number" step="1" aria-label="copper stress limit"><input name="stressAl" type="number" step="1" aria-label="aluminium stress limit"></span></label>
+      <label><b>Conductor bonding</b><select name="bonded"><option value="0">Regular strands (0.35 × Rp0.2)</option><option value="1">Resin-bonded (0.6 × Rp0.2)</option></select></label>
+      <label><b>Axial length value</b><select name="roundLen"><option value="0">Exact (e.g. 138.33)</option><option value="1">Round to whole mm (as CAL1)</option></select></label>
+      <label><b>Radial bulge factor</b><input name="bulge" type="number" step="0.01"></label>
+      <label><b>Stray/tank loss, W per kVA</b><input name="tankWkVA" type="number" step="0.1"></label>
+      <label><b>Core loss factor</b><input name="coreFactor" type="number" step="0.01" title="Design-sheet factor applied to catalogue W/kg (cell N15: 1.32). Calibrate from no-load test results in the Tests tab."></label>
+      <label><b>Core building factor</b><input name="buildF" type="number" step="0.05"></label>
+      <label><b>Overall clearance L / B, mm</b><span class="pair"><input name="clrL" type="number" aria-label="length clearance"><input name="clrB" type="number" aria-label="breadth clearance"></span></label>
+    </div>
+  </details>
+  <details class="sec">
+    <summary>Material prices, ₹/kg</summary>
+    <div class="grid2">
+      <label><b>Core</b><input name="pCore" type="number"></label>
+      <label><b>Conductor</b><input name="pCond" type="number"></label>
+      <label><b>Core steel + SS</b><input name="pSteel" type="number"></label>
+      <label><b>FG insulation</b><input name="pFg" type="number"></label>
+      <label><b>Class H insulation</b><input name="pClh" type="number"></label>
+      <label><b>Resin</b><input name="pResin" type="number"></label>
+      <label><b>Others, %</b><input name="pOthers" type="number"></label>
+    </div>
+  </details>
+  <details class="sec">
+    <summary>Sheet header</summary>
+    <div class="grid2">
+      <label class="full"><b>Party</b><input name="party"></label>
+      <label><b>Work order</b><input name="wo"></label>
+      <label><b>Calc. sheet no.</b><input name="sheetNo"></label>
+      <label><b>Designed by</b><input name="by"></label>
+      <label><b>Approved by</b><input name="appr"></label>
+      <label><b>Checked by</b><input name="chk"></label>
+      <label><b>Revision</b><input name="rev" placeholder="R0"></label>
+      <label><b>Customer PO</b><input name="po"></label>
+      <label><b>Drawing no.</b><input name="dwg"></label>
+    </div>
+  </details>
+</form>
+</aside>
+<main>
+  <div class="bar">
+    <div class="tabs" role="tablist" id="rTabs">
+      <button role="tab" aria-selected="true" data-rtab="sheet">Design sheet</button>
+      <button role="tab" aria-selected="false" data-rtab="comp">Compliance</button>
+      <button role="tab" aria-selected="false" data-rtab="tests">Guarantees and tests</button>
+      <button role="tab" aria-selected="false" data-rtab="steps">Step-by-step</button>
+    </div>
+    <div class="exports">
+      <button class="btn primary" id="rPdf">Download PDF</button>
+      <button class="btn" id="rXlsx">Download Excel</button>
+    </div>
+  </div>
+  <div class="kpis" id="rKpis"></div>
+  <div class="warns" id="rWarns"><strong>Does not meet the requirement yet</strong><ul></ul></div>
+  <p class="okline" id="rOk">Meets every checked requirement: impedance, efficiency, temperature rise, ratio error, flux and current density.</p>
+  <section id="rtab-sheet">
+    <div class="drawing"><h2>General arrangement, to scale</h2><div id="rSvg"></div></div>
+    <div class="sheet" id="rSheet"></div>
+  </section>
+  <section id="rtab-comp" hidden><div class="sheet" id="rComp"></div></section>
+  <section id="rtab-tests" hidden><div class="sheet" id="rTests"></div></section>
+  <section id="rtab-steps" hidden><div class="sheet steps" id="rSteps"></div></section>
+</main>
+</div>
