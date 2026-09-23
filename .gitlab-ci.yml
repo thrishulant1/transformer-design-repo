@@ -1,0 +1,21 @@
+# 1) test: re-runs the reference designs (70 kVA CAL1, 500 kVA method, 600 kVA sheet).
+# 2) pages: publishes index.html only if the test passed, on the default branch.
+stages: [test, deploy]
+
+regression:
+  stage: test
+  image: node:20-alpine
+  script:
+    - node tests/regression.js
+
+pages:
+  stage: deploy
+  needs: [regression]
+  script:
+    - mkdir -p public
+    - cp index.html public/
+  artifacts:
+    paths:
+      - public
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

@@ -1,84 +1,128 @@
-# Dry-type transformer design calculator
+# Dry-type transformer design calculator — v1.1.0
 
 A single-page web app with two design modules:
 
-- **Rectangular core, LV/LV (Class H):** follows the RECT CORE TYPE CAL1 sheet. It can import a requirement sheet, auto-design, check compliance, save designs, and export to PDF and Excel.
-- **Round stepped core (distribution, HV):** follows the 45-step method used for the 500 / 600 / 1600 kVA reference sheets.
+- **Rectangular core, LV/LV:** follows the RECT CORE TYPE CAL1 sheet. It includes:
+  - requirement-sheet import, automatic design and a compliance table with designer confirmations
+  - IEC short-circuit and tolerance checks
+  - guarantees and FAT test comparison with calibration
+  - a shared design library
+  - PDF and Excel export
+- **Round stepped core, HV distribution:** follows the 45-step method used for the 500 / 600 / 1600 kVA references. It has the same checks and the guarantees and tests tab.
 
-Everything is in `index.html`: HTML, CSS, calculation engines and UI. There is no build step and no server. Open the file in a browser, or host it on GitLab Pages or GitHub Pages.
+Everything runs from `index.html`: calculations, screens and exports. There is no server and no build step. `tests/regression.js` re-checks the reference designs.
 
 ## Hosting
 
-**GitLab Pages (recommended for company data)**
-1. Create a project and push `index.html`, `.gitlab-ci.yml` and this README to the default branch.
-2. The pipeline publishes the page to `https://<group>.gitlab.io/<project>/`. Check **Deploy → Pages** for the exact link.
-3. To keep it private, go to **Settings → General → Visibility → Pages** and choose *Only project members*. Then add each user under **Manage → Members**.
+**GitLab Pages (recommended, can be private)**
+1. Push all files to the default branch.
+2. The pipeline runs `tests/regression.js` first. **The site is only updated if every reference check passes.**
+3. Find the link under **Deploy → Pages**.
+4. To keep it private, go to **Settings → General → Visibility → Pages → Only project members**, then add users under **Manage → Members**.
 
 **GitHub Pages**
-1. Push the same files. `.nojekyll` is included.
-2. Go to **Settings → Pages → Deploy from a branch → main / root**.
-3. The page appears at `https://<user>.github.io/<repo>/`.
-4. On a free GitHub account the repository and page must be **public**. Private Pages need GitHub Enterprise.
+1. Push all files and set **Settings → Pages → Source = GitHub Actions**.
+2. The workflow in `.github/workflows/pages.yml` tests first, then deploys `main`.
+3. On free accounts the repository and page must be public.
 
-## How it behaves outside Claude
+## Shared design library
 
-| Feature | Behaviour on GitLab / GitHub |
+| Where the page is opened | Where "Save" stores designs |
 |---|---|
-| Calculations, auto design, drawings | Identical |
-| PDF / Excel download | Normal browser download |
-| Import requirement sheet (.xlsx) | Identical |
-| Saved designs | Stored in **each person's own browser** (localStorage), not shared |
-| Sharing a design with someone else | Use **Export designs (.json)** or the downloaded Excel (it has an *Inputs* sheet); the other person loads it with **Load design file** |
-| Internet needed | Yes, once per visit, for the PDF/Excel libraries (jsDelivr) and fonts (Google Fonts) |
+| The claude.ai link | Shared live between everyone who opens that link (Claude shared storage) |
+| GitLab / GitHub with Supabase configured | Shared Supabase table; refreshed every 20 s and when the tab regains focus |
+| GitLab / GitHub without Supabase | This browser only. Use **Export designs** or the downloaded Excel to share |
 
-Real-time sharing, where one person saves and everyone else sees it instantly, needs a small backend such as a Supabase or Firebase table. The saved-designs code is in one block (search `Saved designs`), so that is where it would be connected.
+**To switch on Supabase:**
+1. Create a free project at supabase.com.
+2. Run `supabase.sql` in its SQL editor.
+3. In `index.html`, search for `SHARED_LIBRARY=` (~line 1610) and fill in `supabaseUrl` and `supabaseAnonKey` (Project Settings → API).
+4. The sample policies let anyone with the link read and write. Tighten them before sharing outside your team.
+
+Designs saved in a browser before the library was switched on can be moved with **Copy this browser's designs to the shared library**.
+
+## Checking a change (automatic and manual)
+
+- **Automatic:** `node tests/regression.js` runs 40 checks against the reference designs. CI runs it on every push.
+- **Manual:** press **70 kVA — your design sheet**. It must show 2.91 %, 268 W, 1,384 W and 298 kg.
+- **Intentional change:** if you change a design rule on purpose (for example after calibration), update the expected value in `tests/regression.js` in the same commit, with a note of the test report behind it.
+
+## What changed in v1.1.0
+
+| Area | Change |
+|---|---|
+| Ratio tolerance | IEC 60076-1: the lower of 0.5 % and Z/10. Refined basis picks turns that meet it |
+| Conductivity | Choice of IEC standard (default for new designs), design-sheet values, or supplier certificate |
+| Axial length | Fullest layer rounded up to whole turns, then + extra turn per layer |
+| Loss reference temperature | Round core defaults by class per IEC 60076-11 (F 120 °C, H 145 °C) |
+| Zigzag | Dzn0 removed until zigzag windings are modelled |
+| Compliance | Rows the tool cannot calculate stay "To confirm" until ticked |
+| Header | Revision, checked by, PO, drawing no., tool version on every PDF page |
+| Short circuit | IEC 60076-5 thermal (2 s default), radial force, hoop stress, axial estimate; fault level and duration inputs; optional "required" in auto design |
+| Guarantees and tests | IEC 60076-1 tolerances, FAT comparison, calibration with Apply |
+| Auto design | Flux density searched when blank; runs in a background worker |
+| Other | Altitude derating, K-factor, E/C/F classes, PD note ≥ 3.6 kV, 60 Hz loss correction, noise estimate, IS 1180 / customer loss limits, round-core no-load current and cost, Excel "Values" sheet |
 
 ## What you can edit
 
-Open `index.html` in any editor, search for the text shown, change it, then commit. Line numbers are approximate and move as you edit, so the search text is the reliable reference.
+Open `index.html`, search for the text shown, change it, run `node tests/regression.js`, then commit. Line numbers are approximate.
 
-### Rectangular core (LV/LV)
-
-| What | Search for | Notes |
-|---|---|---|
-| Core-loss table W/kg vs B (CRNO-35, M4-27, MOH-23) | `RC.CORELOSS=` (~line 611) | From the CORELOSS sheet. Add a grade by adding a list of the same length and an `<option>` in the *Core grade* select |
-| VA/kg table for no-load current | `RC.VAKG=` (~615) | From the VA sheet |
-| Conductor data: conductivity at 90/115 °C, density, stray factor | `RC.COND=` (~616) | Cu 44.7 / 42.76, Al 28 / 26.73 |
-| Lamination widths tried by auto design | `RC.LAM=` (~618) | Standard core widths, mm |
-| Main calculation (CAL1 logic) | `function rectDesign` (~636) | Each block is commented: V/t, core, windings, build-up, resistance, stray, impedance, core loss, NL current, thermal, mechanical, BOM |
-| Temperature-rise rule | `const rise1=15` (~706) | Inner `15 + W/m²/5`, outer `15 + W/m²/7` |
-| Auto-design search | `function rectAuto` (~759) | K range (`const Ks=`), winding length range (`for(let Lt=100`), scoring weights (`s+=` lines) |
-| Engine defaults (clearances, factors, insulation) | `const RC_DEFAULTS=` (~792) | Also settable from the form |
-| Built-in requirement rows | `const REQ_DEFAULT=` (~1001) | The TRX 70 kVA sheet; replaced when you import one |
-| Form defaults, prices, designer names | `const RBASE=` (~1016) | Prices `pCore`, `pCond` and the rest; party, designed/approved by |
-| Preset buttons (70 kVA sheet, auto 70) | `const RPRESETS=` (~1019) | **Add your own designs here** (see below) |
-| Compliance wording | `function compRows` (~1105) | "Offered" text for each requirement row |
-| Step-by-step text | `function rSteps` (~1123) | Wording of each calculation step |
-
-**Adding a permanent preset button**, for example your 8 kVA design:
-1. In the page, enter the design and press **Download Excel**. Open its **Inputs** sheet: it lists every field name and value.
-2. In `index.html`, add an entry to `RPRESETS`, for example
-   `kva8:{...RBASE, kVA:8, priV:433, secV:400, K:79, W:50, hvType:'round', hvB:2.5, hvRad:1, hvAx:1, N2:104, hvLayers:2, roundLen:'0', ... },`
-3. Add a button next to the others: `<button class="btn sm" data-rpreset="kva8">8 kVA</button>` (search `data-rpreset="auto70"`).
-
-### Round stepped core (distribution)
-
+### Standards and shared rules
 | What | Search for |
 |---|---|
-| Core-loss tables by grade | `CORE_GRADES = {` (~378) |
-| Temperature-rise limits by class | `const CLASS_RISE` (~383) |
-| Clearances and test voltages by HV class | `function hvClass` (~390) |
-| Main 45-step calculation | `function design(p)` (~413) |
-| Auto optimiser (window height, ducts) | `function designAuto` (~577) |
-| Reference presets (500 / 600 / 1600 kVA) | `const PRESETS=` (~808) |
+| Tool version shown on sheets | `APP_VERSION=` (~415) |
+| Resistivity at 20 °C (Cu, Al) | `STD.RHO=` (~418) |
+| Reference temperature by class | `STD.REF_TEMP=` (~421) |
+| Rise limits by class, altitude derating | `STD.RISE=`, `STD.altitudeFactor` (~423) |
+| Test tolerances (+10 %, +15 %, +30 %, ±10 / ±7.5 %) | `STD.TOL=` (~429) |
+| Short-circuit temperature limits | `STD.SC_LIMIT=` (~432) |
+| Short-circuit calculation | `STD.shortCircuit=` (~438) |
+| Noise estimate formula | `STD.noise=` (~452) |
+| Frequency and harmonic factors | `STD.fLoss=`, `STD.kEddy=` (~454) |
 
-### Look and text
-- Colours and fonts are at the top of the `<style>` block (`:root{ --bg: … }`).
-- Page title and intro are in `<header class="top">`.
+### Rectangular core
+| What | Search for |
+|---|---|
+| Core-loss table (CORELOSS sheet) | `RC.CORELOSS=` (~729) |
+| VA/kg table (VA sheet) | `RC.VAKG=` (~734) |
+| Design-sheet conductivity, density, stray factor | `RC.COND=` (~736) |
+| Lamination widths for auto design | `RC.LAM=` (~737) |
+| Main calculation | `function rectDesign` (~758) |
+| Temperature-rise rule | `const rise1=` (~839) |
+| Design checks list | `const chk=(name,req,got,ok)=>o.checks` (~874) |
+| Auto-design scoring | `function rcScore` (~906) |
+| Auto-design search ranges | `function rectAuto1` (~919) |
+| Engine defaults | `const RC_DEFAULTS=` (~967) |
+| Built-in requirement rows | `const REQ_DEFAULT=` (~1264) |
+| Form defaults, prices, names | `const RBASE=` (~1279) |
+| Preset buttons | `const RPRESETS=` (~1284) |
+| Which rows are declarations | `const R_DECL=` (~1402) |
+| Compliance wording | `function compRows` (~1414) |
 
-## Checking a change
+**Adding a preset button**, for example 8 kVA:
+1. Download Excel for the design and copy the field names and values from its **Inputs** sheet.
+2. Add an entry to `RPRESETS`, for example `kva8:{...RBASE, kVA:8, ...}`.
+3. Add `<button class="btn sm" data-rpreset="kva8">8 kVA</button>` next to `data-rpreset="auto70"`.
 
-1. Open `index.html` locally in a browser before committing.
-2. Press **70 kVA — your design sheet**. It should still show impedance 2.91 %, core loss 268 W, load loss 1,384 W and total mass 298 kg, matching the CAL1 sheet.
-3. For the round core, **500 kVA Cu ref.** should give core Ø219 mm, core loss 1,537 W and 1,750 × 830 mm enclosure.
-4. If those still match, commit. The pipeline redeploys in about a minute.
+### Round core
+| What | Search for |
+|---|---|
+| Core-loss tables | `CORE_GRADES = {` (~463) |
+| Clearances and test voltages by HV class | `function hvClass` (~475) |
+| Main calculation | `function design(p)` (~498) |
+| Ratio, no-load current, short circuit, checks | `Phase 2: ratio tolerance` (~654) |
+| Auto optimiser | `function designAuto` (~693) |
+| Reference presets | `const PRESETS=` (~1034) |
+
+### Guarantees and tests (both modules)
+| What | Search for |
+|---|---|
+| Tolerances table and pass/fail logic | `function gtRows` (~986) |
+| Calibration factors | `function gtCal` (~1008) |
+
+## Known limits (next phase)
+- Hoop stress uses a circular-equivalent formula. Rectangular coils have higher corner stresses, so verify critical designs separately.
+- Axial short-circuit force is an estimate.
+- The noise formula needs one measured unit to calibrate its constant: use the Tests tab, then Apply.
+- Foil windings, zigzag windings and HV disc windings are not modelled.
+- The temperature-rise rule is the design sheet's empirical rule. Calibrate it with heat-run results in the Tests tab.
