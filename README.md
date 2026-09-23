@@ -1,4 +1,4 @@
-# Dry-type transformer design calculator — v1.1.0
+# Dry-type transformer design calculator — v1.1.1
 
 A single-page web app with two design modules:
 
@@ -36,7 +36,7 @@ Everything runs from `index.html`: calculations, screens and exports. There is n
 **To switch on Supabase:**
 1. Create a free project at supabase.com.
 2. Run `supabase.sql` in its SQL editor.
-3. In `index.html`, search for `SHARED_LIBRARY=` (~line 1610) and fill in `supabaseUrl` and `supabaseAnonKey` (Project Settings → API).
+3. In `index.html`, search for `SHARED_LIBRARY=` (~line 1655) and fill in `supabaseUrl` and `supabaseAnonKey` (Project Settings → API).
 4. The sample policies let anyone with the link read and write. Tighten them before sharing outside your team.
 
 Designs saved in a browser before the library was switched on can be moved with **Copy this browser's designs to the shared library**.
@@ -46,6 +46,11 @@ Designs saved in a browser before the library was switched on can be moved with 
 - **Automatic:** `node tests/regression.js` runs 40 checks against the reference designs. CI runs it on every push.
 - **Manual:** press **70 kVA — your design sheet**. It must show 2.91 %, 268 W, 1,384 W and 298 kg.
 - **Intentional change:** if you change a design rule on purpose (for example after calibration), update the expected value in `tests/regression.js` in the same commit, with a note of the test report behind it.
+
+## What changed in v1.1.1
+
+- PDF: every section is fitted to the fewest pages (smaller font only when it saves a page, never below 5.3 pt), so no orphan rows on an extra page. Rectangular core: 4 pages; round core: 4 pages.
+- Sidebar: scrolls on its own beside the results; collapsible sections; site / short-circuit fields moved to their own section; even button grids; larger drawing labels.
 
 ## What changed in v1.1.0
 
@@ -70,34 +75,34 @@ Open `index.html`, search for the text shown, change it, run `node tests/regress
 ### Standards and shared rules
 | What | Search for |
 |---|---|
-| Tool version shown on sheets | `APP_VERSION=` (~415) |
-| Resistivity at 20 °C (Cu, Al) | `STD.RHO=` (~418) |
-| Reference temperature by class | `STD.REF_TEMP=` (~421) |
-| Rise limits by class, altitude derating | `STD.RISE=`, `STD.altitudeFactor` (~423) |
-| Test tolerances (+10 %, +15 %, +30 %, ±10 / ±7.5 %) | `STD.TOL=` (~429) |
-| Short-circuit temperature limits | `STD.SC_LIMIT=` (~432) |
-| Short-circuit calculation | `STD.shortCircuit=` (~438) |
-| Noise estimate formula | `STD.noise=` (~452) |
-| Frequency and harmonic factors | `STD.fLoss=`, `STD.kEddy=` (~454) |
+| Tool version shown on sheets | `APP_VERSION=` (~443) |
+| Resistivity at 20 °C (Cu, Al) | `STD.RHO=` (~446) |
+| Reference temperature by class | `STD.REF_TEMP=` (~449) |
+| Rise limits by class, altitude derating | `STD.RISE=`, `STD.altitudeFactor` (~451) |
+| Test tolerances (+10 %, +15 %, +30 %, ±10 / ±7.5 %) | `STD.TOL=` (~457) |
+| Short-circuit temperature limits | `STD.SC_LIMIT=` (~460) |
+| Short-circuit calculation | `STD.shortCircuit=` (~466) |
+| Noise estimate formula | `STD.noise=` (~480) |
+| Frequency and harmonic factors | `STD.fLoss=`, `STD.kEddy=` (~482) |
 
 ### Rectangular core
 | What | Search for |
 |---|---|
-| Core-loss table (CORELOSS sheet) | `RC.CORELOSS=` (~729) |
-| VA/kg table (VA sheet) | `RC.VAKG=` (~734) |
-| Design-sheet conductivity, density, stray factor | `RC.COND=` (~736) |
-| Lamination widths for auto design | `RC.LAM=` (~737) |
-| Main calculation | `function rectDesign` (~758) |
-| Temperature-rise rule | `const rise1=` (~839) |
-| Design checks list | `const chk=(name,req,got,ok)=>o.checks` (~874) |
-| Auto-design scoring | `function rcScore` (~906) |
-| Auto-design search ranges | `function rectAuto1` (~919) |
-| Engine defaults | `const RC_DEFAULTS=` (~967) |
-| Built-in requirement rows | `const REQ_DEFAULT=` (~1264) |
-| Form defaults, prices, names | `const RBASE=` (~1279) |
-| Preset buttons | `const RPRESETS=` (~1284) |
-| Which rows are declarations | `const R_DECL=` (~1402) |
-| Compliance wording | `function compRows` (~1414) |
+| Core-loss table (CORELOSS sheet) | `RC.CORELOSS=` (~757) |
+| VA/kg table (VA sheet) | `RC.VAKG=` (~762) |
+| Design-sheet conductivity, density, stray factor | `RC.COND=` (~764) |
+| Lamination widths for auto design | `RC.LAM=` (~765) |
+| Main calculation | `function rectDesign` (~786) |
+| Temperature-rise rule | `const rise1=` (~867) |
+| Design checks list | `const chk=(name,req,got,ok)=>o.checks` (~902) |
+| Auto-design scoring | `function rcScore` (~934) |
+| Auto-design search ranges | `function rectAuto1` (~947) |
+| Engine defaults | `const RC_DEFAULTS=` (~995) |
+| Built-in requirement rows | `const REQ_DEFAULT=` (~1303) |
+| Form defaults, prices, names | `const RBASE=` (~1318) |
+| Preset buttons | `const RPRESETS=` (~1323) |
+| Which rows are declarations | `const R_DECL=` (~1441) |
+| Compliance wording | `function compRows` (~1453) |
 
 **Adding a preset button**, for example 8 kVA:
 1. Download Excel for the design and copy the field names and values from its **Inputs** sheet.
@@ -107,18 +112,18 @@ Open `index.html`, search for the text shown, change it, run `node tests/regress
 ### Round core
 | What | Search for |
 |---|---|
-| Core-loss tables | `CORE_GRADES = {` (~463) |
-| Clearances and test voltages by HV class | `function hvClass` (~475) |
-| Main calculation | `function design(p)` (~498) |
-| Ratio, no-load current, short circuit, checks | `Phase 2: ratio tolerance` (~654) |
-| Auto optimiser | `function designAuto` (~693) |
-| Reference presets | `const PRESETS=` (~1034) |
+| Core-loss tables | `CORE_GRADES = {` (~491) |
+| Clearances and test voltages by HV class | `function hvClass` (~503) |
+| Main calculation | `function design(p)` (~526) |
+| Ratio, no-load current, short circuit, checks | `Phase 2: ratio tolerance` (~682) |
+| Auto optimiser | `function designAuto` (~721) |
+| Reference presets | `const PRESETS=` (~1062) |
 
 ### Guarantees and tests (both modules)
 | What | Search for |
 |---|---|
-| Tolerances table and pass/fail logic | `function gtRows` (~986) |
-| Calibration factors | `function gtCal` (~1008) |
+| Tolerances table and pass/fail logic | `function gtRows` (~1014) |
+| Calibration factors | `function gtCal` (~1036) |
 
 ## Known limits (next phase)
 - Hoop stress uses a circular-equivalent formula. Rectangular coils have higher corner stresses, so verify critical designs separately.

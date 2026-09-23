@@ -104,6 +104,23 @@ main{padding:16px 22px 60px;min-width:0}
 .gtro{font-weight:600}
 .callist{margin:4px 0 8px;padding-left:18px}.callist li{margin:4px 0}
 label.conf{flex-direction:row;align-items:center;gap:5px;color:inherit;font-size:13px}
+
+/* sidebar: scrolls on its own beside the results on desktop */
+@media (min-width:901px){ .layout>aside.form{position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable} }
+.presets{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px}
+.presets .btn{width:100%;text-align:center;justify-content:center}
+.presets .wide{grid-column:1/-1}
+.btn.filebtn{justify-content:center;text-align:center}
+details.sec{border-top:1px solid var(--rule);padding:10px 0 6px;margin:0}
+details.sec>summary{list-style:none;display:flex;align-items:baseline;gap:8px;font-family:var(--fh);font-weight:600;font-size:18px;cursor:pointer;margin:0 0 8px;color:var(--ink)}
+details.sec>summary::-webkit-details-marker{display:none}
+details.sec>summary::before{content:'';flex:0 0 auto;width:7px;height:7px;border-right:2px solid var(--ink2);border-bottom:2px solid var(--ink2);transform:rotate(-45deg);margin-right:4px;align-self:center;transition:transform .15s}
+details.sec[open]>summary::before{transform:rotate(45deg)}
+details.sec>summary small{font-family:var(--fb);font-weight:400;font-size:12.5px;color:var(--ink2)}
+details.sec:not([open])>summary{margin-bottom:0}
+@media (prefers-reduced-motion:reduce){details.sec>summary::before{transition:none}}
+.grid2>label,.grid4>label{min-width:0}
+label b{white-space:normal}
 .grid4{display:grid;grid-template-columns:1.1fr 1fr 1fr 1.2fr;gap:8px}
 .pair{display:flex;gap:4px}.pair input,.pair select{min-width:0}
 .subhead{font-size:13px;font-weight:600;margin:10px 0 4px;color:var(--ink)}
@@ -111,7 +128,7 @@ label.conf{flex-direction:row;align-items:center;gap:5px;color:inherit;font-size
 .filebtn:focus-within{outline:3px solid var(--accent);outline-offset:2px}
 .saved{border:1px solid var(--rule);padding:8px 10px 10px;margin-bottom:12px;background:var(--bg)}
 .saved .subhead{margin-top:0}
-.saverow{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}.saverow input,.saverow select{flex:1;min-width:120px}
+.saverow{display:grid;grid-template-columns:1fr auto;gap:6px;margin-top:6px}.saverow.three{grid-template-columns:1fr auto auto}.saverow.two{grid-template-columns:1fr 1fr}.saverow.one{grid-template-columns:1fr}.saverow input,.saverow select{min-width:0;width:100%}.saverow .btn{white-space:nowrap}
 </style>
 </head>
 <body>
@@ -129,14 +146,14 @@ label.conf{flex-direction:row;align-items:center;gap:5px;color:inherit;font-size
 <div class="layout" id="layout-round" hidden>
 <aside class="form">
   <div class="presets" aria-label="Load a reference design">
-    <button class="btn sm" data-preset="p500">500 kVA Cu ref.</button>
-    <button class="btn sm" data-preset="p600">600 kVA Al ref.</button>
+    <button class="btn sm" data-preset="p500">500 kVA Cu</button>
+    <button class="btn sm" data-preset="p600">600 kVA Al</button>
     <button class="btn sm" data-preset="p1600">1600 kVA Cu</button>
     <button class="btn sm" data-preset="blank">Defaults</button>
   </div>
 <form id="f" autocomplete="off" onsubmit="return false">
-  <fieldset>
-    <legend>Rating <small><span class="req">*</span> required</small></legend>
+  <details class="sec" open>
+    <summary>Rating <small><span class="req">*</span> required</small></summary>
     <div class="grid2">
       <label><b>Capacity, kVA <span class="req">*</span></b><input name="kVA" type="number" min="5" step="any" required></label>
       <label><b>Frequency, Hz <span class="req">*</span></b><select name="freq"><option>50</option><option>60</option></select></label>
@@ -148,10 +165,10 @@ label.conf{flex-direction:row;align-items:center;gap:5px;color:inherit;font-size
       <label><b>LV conductor <span class="req">*</span></b><select name="lvMat"><option value="Cu">Copper</option><option value="Al">Aluminium</option></select></label>
       <label><b>HV conductor <span class="req">*</span></b><select name="hvMat"><option value="Cu">Copper</option><option value="Al">Aluminium</option></select></label>
     </div>
-  </fieldset>
+  </details>
 
-  <fieldset>
-    <legend>Design choices <small>defaults are typical</small></legend>
+  <details class="sec" open>
+    <summary>Design choices <small>defaults are typical</small></summary>
     <div class="grid2">
       <label><b>Constant k</b><input name="k" type="number" step="0.001" min="0.2" max="1"></label>
       <label><b>Flux density, T</b><input name="B" type="number" step="0.01" min="1" max="1.8"></label>
@@ -165,6 +182,11 @@ label.conf{flex-direction:row;align-items:center;gap:5px;color:inherit;font-size
       <label><b>Core joint</b><select name="joint"><option value="mitred">Mitred</option><option value="step">Step-lap</option></select></label>
       <label><b>Loss reference temp, °C</b><select name="refTemp"><option value="auto">By class (IEC 60076-11)</option><option>75</option><option>90</option><option>100</option><option>115</option><option>120</option><option>145</option></select></label>
       <label><b>Enclosure</b><select name="enclosure"><option value="1">IP23 enclosure</option><option value="0">Without</option></select></label>
+    </div>
+  </details>
+  <details class="sec">
+    <summary>Site, short circuit and loss limits</summary>
+    <div class="grid2">
       <label><b>Ambient, °C</b><input name="amb" type="number" step="1"></label>
       <label><b>Altitude, m</b><input name="altitude" type="number" step="100" min="0"></label>
       <label><b>System fault level, MVA</b><input name="faultMVA" type="number" step="any" placeholder="infinite bus"></label>
@@ -173,11 +195,11 @@ label.conf{flex-direction:row;align-items:center;gap:5px;color:inherit;font-size
       <label><b>Max total loss @100 %, W</b><input name="maxLoss100" type="number" step="1" placeholder="IS 1180 / customer"></label>
       <label><b>Noise max, dB</b><input name="noiseMax" type="number" step="1" placeholder="optional"></label>
     </div>
-  </fieldset>
+  </details>
 
   <button type="button" class="btn sm" id="fixRound" hidden style="margin-bottom:10px">Copy the automatic values into the Advanced fields</button>
-  <details id="adv">
-    <summary>Advanced — leave blank for automatic sizing</summary>
+  <details id="adv" class="sec">
+    <summary>Advanced <small>blank = automatic sizing</small></summary>
     <div class="grid2">
       <label><b>Window height, mm</b><input name="window" type="number" placeholder="auto"></label>
       <label><b>Core diameter, mm</b><input name="coreDia" type="number" placeholder="auto"></label>
@@ -209,7 +231,7 @@ label.conf{flex-direction:row;align-items:center;gap:5px;color:inherit;font-size
     <p class="hint">Automatic rules follow the step method: clearances by HV insulation level (IS 11171), duct width by winding length, LV parallels chosen for the fewest strips with height ≤ 5 mm (Cu) or 6 mm (Al).</p>
   </details>
 
-  <details open>
+  <details class="sec">
     <summary>Sheet header</summary>
     <div class="grid2">
       <label class="full"><b>Party / customer</b><input name="party"></label>
@@ -254,20 +276,21 @@ label.conf{flex-direction:row;align-items:center;gap:5px;color:inherit;font-size
 <div class="layout" id="layout-rect">
 <aside class="form">
   <div class="presets" aria-label="Load a reference design">
-    <button class="btn sm" data-rpreset="sheet70">70 kVA — your design sheet</button>
-    <button class="btn sm" data-rpreset="auto70">70 kVA — auto design</button>
-    <label class="btn sm filebtn">Import requirement sheet (.xlsx)<input type="file" id="reqFile" accept=".xlsx,.xls,.csv" hidden></label>
+    <button class="btn sm" data-rpreset="sheet70">Your 70 kVA sheet</button>
+    <button class="btn sm" data-rpreset="auto70">70 kVA auto design</button>
+    <label class="btn sm filebtn wide">Import requirement sheet (.xlsx)<input type="file" id="reqFile" accept=".xlsx,.xls,.csv" hidden></label>
   </div>
   <div class="saved" aria-label="Saved designs">
     <p class="subhead">Saved designs <span class="libmode" id="libMode">This browser only</span></p>
     <div class="saverow"><input id="saveName" placeholder="Name, e.g. 8 kVA round wire" aria-label="Design name"><button type="button" class="btn sm primary" id="saveBtn">Save</button></div>
-    <div class="saverow"><select id="savedList" aria-label="Saved designs"><option value="">No saved designs yet</option></select><button type="button" class="btn sm" id="loadBtn">Load</button><button type="button" class="btn sm" id="delBtn">Delete</button></div>
-    <div class="saverow"><button type="button" class="btn sm" id="expBtn">Export designs (.json)</button><label class="btn sm filebtn">Load design file (.json or Excel)<input type="file" id="impFile" accept=".json,.xlsx" hidden></label><button type="button" class="btn sm" id="pushLocal" hidden>Copy this browser's designs to the shared library</button></div>
+    <div class="saverow three"><select id="savedList" aria-label="Saved designs"><option value="">No saved designs yet</option></select><button type="button" class="btn sm" id="loadBtn">Load</button><button type="button" class="btn sm" id="delBtn">Delete</button></div>
+    <div class="saverow two"><button type="button" class="btn sm" id="expBtn">Export (.json)</button><label class="btn sm filebtn">Load file (.json / Excel)<input type="file" id="impFile" accept=".json,.xlsx" hidden></label></div>
+    <div class="saverow one"><button type="button" class="btn sm" id="pushLocal" hidden>Copy this browser's designs to the shared library</button></div>
   </div>
   <p class="hint" id="reqStatus">Requirement: TRX 70 kVA, 433 V / 400 V, Al, Dyn11 (built in).</p>
 <form id="rf" autocomplete="off" onsubmit="return false">
-  <fieldset>
-    <legend>Requirement <small><span class="req">*</span> from the requirement sheet</small></legend>
+  <details class="sec" open>
+    <summary>Requirement <small><span class="req">*</span> from the requirement sheet</small></summary>
     <div class="grid2">
       <label><b>Rating, kVA <span class="req">*</span></b><input name="kVA" type="number" step="any" min="1"></label>
       <label><b>Frequency, Hz <span class="req">*</span></b><select name="freq"><option>50</option><option>60</option></select></label>
@@ -285,6 +308,11 @@ label.conf{flex-direction:row;align-items:center;gap:5px;color:inherit;font-size
       <label><b>Core grade</b><select name="grade"><option value="M4-27">CRGO M4 0.27</option><option value="MOH-23">CRGO MOH 0.23</option><option value="CRNO-35">CRNO 0.35</option></select></label>
       <label><b>Noise max, dB</b><input name="noiseMax" type="number" step="1"></label>
       <label><b>Enclosure</b><select name="enclosure"><option value="0">Not required</option><option value="1">CRCA enclosure</option></select></label>
+    </div>
+  </details>
+  <details class="sec">
+    <summary>Site, short circuit and classes</summary>
+    <div class="grid2">
       <label><b>Altitude, m</b><input name="altitude" type="number" step="100" min="0"></label>
       <label><b>Load K-factor</b><input name="kFactor" type="number" step="1" min="1" title="1 = linear loads; K-4, K-13 for non-linear loads"></label>
       <label><b>System fault level, MVA</b><input name="faultMVA" type="number" step="any" min="0" placeholder="infinite bus"></label>
@@ -293,9 +321,9 @@ label.conf{flex-direction:row;align-items:center;gap:5px;color:inherit;font-size
       <label><b>Environmental / climatic</b><span class="pair"><select name="envClass" aria-label="Environmental class"><option>E0</option><option>E1</option><option selected>E2</option></select><select name="climClass" aria-label="Climatic class"><option>C1</option><option selected>C2</option></select></span></label>
       <label><b>Fire behaviour</b><select name="fireClass"><option>F0</option><option selected>F1</option></select></label>
     </div>
-  </fieldset>
-  <fieldset>
-    <legend>Design <small>blank = chosen automatically</small></legend>
+  </details>
+  <details class="sec" open>
+    <summary>Design <small>blank = chosen automatically</small></summary>
     <div class="grid2">
       <label class="full"><b>Calculation basis</b><select name="basis"><option value="sheet">As per design sheet (matches CAL1)</option><option value="refined">Refined (revised V/t, interpolated tables, full stray formula)</option></select></label>
       <label><b>Constant K</b><input name="K" type="number" step="0.5" placeholder="auto"></label>
@@ -325,8 +353,8 @@ label.conf{flex-direction:row;align-items:center;gap:5px;color:inherit;font-size
     </div>
     <p class="hint" id="rAutoNote"></p>
     <button type="button" class="btn sm" id="rFix" hidden>Copy the automatic values into the fields</button>
-  </fieldset>
-  <details>
+  </details>
+  <details class="sec">
     <summary>Clearances, insulation and factors</summary>
     <div class="grid2">
       <label><b>Bobbin gap (total), mm</b><input name="gap" type="number" step="0.5"></label>
@@ -354,7 +382,7 @@ label.conf{flex-direction:row;align-items:center;gap:5px;color:inherit;font-size
       <label><b>Overall clearance L / B, mm</b><span class="pair"><input name="clrL" type="number" aria-label="length clearance"><input name="clrB" type="number" aria-label="breadth clearance"></span></label>
     </div>
   </details>
-  <details>
+  <details class="sec">
     <summary>Material prices, ₹/kg</summary>
     <div class="grid2">
       <label><b>Core</b><input name="pCore" type="number"></label>
@@ -366,7 +394,7 @@ label.conf{flex-direction:row;align-items:center;gap:5px;color:inherit;font-size
       <label><b>Others, %</b><input name="pOthers" type="number"></label>
     </div>
   </details>
-  <details open>
+  <details class="sec">
     <summary>Sheet header</summary>
     <div class="grid2">
       <label class="full"><b>Party</b><input name="party"></label>
@@ -412,7 +440,7 @@ label.conf{flex-direction:row;align-items:center;gap:5px;color:inherit;font-size
 
 <script id="engines">
 // ===== Shared standards helpers (used by both engines) =====
-const APP_VERSION='1.1.0 (23 Sep 2026)';
+const APP_VERSION='1.1.1 (23 Sep 2026)';
 const STD={};
 // Resistivity at 20 °C (Ω·mm²/m) and temperature constant: Cu 100 % IACS, EC aluminium 61 % IACS
 STD.RHO={Cu:{r20:0.017241,k:234.5},Al:{r20:0.028264,k:225}};
@@ -1160,8 +1188,8 @@ function renderKpis(o){
 function renderSVG(o){
   // Axial direction drawn horizontally (z), radial vertically (r measured from limb centre line).
   const c=o.core,lv=o.lv,hv=o.hv, Hw=o.window, yoke=c.yoke; const Rmax=hv.OD/2+30;
-  const padL=20,padT=40,Z=2*yoke+Hw,Wd=Z+padL*2+140,Hd=2*Rmax+padT*2+20; const cy=padT+Rmax;
-  const fs=Math.max(13,Wd/75);
+  const Z=2*yoke+Hw; const fs=Math.max(15,(Z+180)/52);
+  const padL=20,padT=Math.round(fs*2.6),Wd=Z+padL*2+Math.round(fs*9),Hd=2*Rmax+padT*2+20; const cy=padT+Rmax;
   const R=(z,r,zl,rl,fill,op)=>'<rect x="'+(padL+z)+'" y="'+(cy+r)+'" width="'+zl+'" height="'+rl+'" fill="'+fill+'"'+(op?' opacity="'+op+'"':'')+'/>';
   let s='<svg viewBox="0 0 '+Wd+' '+Hd+'" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Section of one limb, to scale" font-family="Barlow, Arial" font-size="'+fs+'" style="color:var(--ink)">';
   s+=R(0,-Rmax,yoke,2*Rmax,'#5C6B78',.35)+R(yoke+Hw,-Rmax,yoke,2*Rmax,'#5C6B78',.35)+R(0,-c.D/2,Z,c.D,'#5C6B78',.6);
@@ -1176,7 +1204,7 @@ function renderSVG(o){
   const vdim=(x,r1,r2,t)=>{const y1=cy+r1,y2=cy+r2;return '<line x1="'+x+'" y1="'+y1+'" x2="'+x+'" y2="'+y2+'" stroke="currentColor" stroke-width="1.4"/><line x1="'+(x-7)+'" y1="'+y1+'" x2="'+(x+7)+'" y2="'+y1+'" stroke="currentColor"/><line x1="'+(x-7)+'" y1="'+y2+'" x2="'+(x+7)+'" y2="'+y2+'" stroke="currentColor"/><text x="'+(x+10)+'" y="'+((y1+y2)/2+fs/3)+'" fill="currentColor">'+t+'</text>';};
   const xr=padL+Z+14; s+=vdim(xr,-c.D/2,c.D/2,'Ø'+c.D)+vdim(xr+60,-hv.OD/2,-hv.ID/2,'HV '+hv.rad);
   s+=vdim(xr+60,lv.ID/2,lv.OD/2,'LV '+lv.rad);
-  s+='<line x1="'+(padL+yoke)+'" y1="'+(padT-18)+'" x2="'+(padL+yoke+Hw)+'" y2="'+(padT-18)+'" stroke="currentColor" stroke-width="1.4"/><text x="'+(padL+yoke+Hw/2)+'" y="'+(padT-24)+'" text-anchor="middle" fill="currentColor">Window '+Hw+' mm</text>';
+  s+='<line x1="'+(padL+yoke)+'" y1="'+(padT-fs*0.9)+'" x2="'+(padL+yoke+Hw)+'" y2="'+(padT-fs*0.9)+'" stroke="currentColor" stroke-width="1.4"/><text x="'+(padL+yoke+Hw/2)+'" y="'+(padT-fs*1.3)+'" text-anchor="middle" fill="currentColor">Window '+Hw+' mm</text>';
   s+='<text x="'+(padL+yoke+Hw/2)+'" y="'+(cy+fs/3)+'" text-anchor="middle" fill="#fff" font-weight="600">Core limb</text>';
   s+='<text x="'+(padL+yoke+8)+'" y="'+(cy-hv.OD/2-8)+'" fill="#9B4A26" font-weight="600">HV, '+hv.coils+' coil'+(hv.coils>1?'s':'')+(hv.ducts?' + '+hv.ducts+' duct'+(hv.ducts>1?'s':''):'')+'</text>';
   s+='<text x="'+(padL+yoke+Hw-8)+'" y="'+(cy-lv.OD/2-6)+'" text-anchor="end" fill="#A0741A" font-weight="600">LV, '+lv.layers+' layers + '+lv.ducts+' duct'+(lv.ducts!==1?'s':'')+'</text>';
@@ -1214,31 +1242,42 @@ async function saveFile(name,blob){
 }
 function fname(ext){ const p=CUR.o.inp; return 'Design_'+p.kVA+'kVA_'+Math.round(p.hvV/100)/10+'kV_'+p.lvV+'V.'+ext; }
 function pdfText(s){ return String(s).replace(/−/g,'-').replace(/δ/g,'delta').replace(/′/g,"'").replace(/₹/g,'Rs').replace(/■/g,'').replace(/Ω/g,'Ohm').replace(/Ø/g,'dia ').replace(/≈/g,'~').replace(/√/g,'sqrt').replace(/×/g,'x').replace(/÷/g,'/').replace(/²/g,'2').replace(/⁴/g,'^4').replace(/⁻⁶/g,'^-6').replace(/⁻³/g,'^-3').replace(/⁻¹/g,'^-1').replace(/·/g,'.').replace(/–|—/g,'-').replace(/₇₅/g,'75').replace(/°/g,' deg ').replace(/ deg C/g,' degC').replace(/ρ/g,'rho').replace(/π/g,'pi').replace(/ⁱ/g,'').replace(/[^\x00-\xFF]/g,''); }
+// PDF layout helper: draw a section on a fresh page with several font sizes and keep the one that needs the fewest pages
+// (largest font on a tie), so no table leaves a few orphan rows on an extra page.
+function pdfFit(d,draw,fonts){ fonts=fonts||[7,6.5,6,5.6,5.3]; const start=d.getNumberOfPages(); let best=null;
+  for(const fs of fonts){ draw(fs); const used=d.getNumberOfPages()-start+1; if(!best||used<best.used) best={fs,used};
+    for(let i=d.getNumberOfPages();i>=start;i--) d.deletePage(i); d.addPage(); if(best.used===1) break; }
+  draw(best.fs); return best; }
+// Page 1 must be one page: rebuild the document with smaller fonts until it fits.
+function pdfFirstPage(make,fonts){ fonts=fonts||[6.4,6,5.6,5.3]; let d=null;
+  for(const fs of fonts){ d=make(fs); if(d.getNumberOfPages()===1) return d; } return d; }
 $('#dlPdf').addEventListener('click',()=>{
   if(!CUR) return; if(!window.jspdf){ toast('PDF library did not load. Check your connection and reload.'); return; }
-  const {jsPDF}=window.jspdf; const d=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'}); const M=CUR.M; const P=v=>v.map(r=>r.map(pdfText));
+  const {jsPDF}=window.jspdf; const M=CUR.M; const P=v=>v.map(r=>r.map(pdfText));
   const ink=[23,33,43], head=[228,233,238];
-  const base={theme:'grid',styles:{fontSize:7,cellPadding:1,lineColor:[150,160,170],lineWidth:0.15,textColor:ink},headStyles:{fillColor:head,textColor:ink,fontStyle:'bold'},columnStyles:{0:{fontStyle:'bold'}}};
-  // title block
-  d.setDrawColor(...ink); d.setLineWidth(0.5); d.rect(8,8,281,27); d.setFont('helvetica','bold'); d.setFontSize(11); d.text(pdfText(M.title.title),10,13);
-  d.setFont('helvetica','normal'); d.setFontSize(6.6); M.title.cells.forEach((c,i)=>{ const x=10+(i%6)*46.5, y=18+Math.floor(i/6)*5; d.setTextColor(90); d.text(pdfText(c[0]),x,y); d.setTextColor(...ink); d.text(pdfText(c[1]).slice(0,40),x,y+2.6); });
-  const sm={...base,styles:{...base.styles,fontSize:6,cellPadding:0.55}};
-  d.autoTable({...sm,startY:38,margin:{left:8,right:150},head:[['Winding data','LV (inner)','HV (outer)']],body:P(M.wind),columnStyles:{0:{fontStyle:'bold',cellWidth:38}}});
-  let y=38; const R={...sm,margin:{left:152,right:8}};
-  const sec=(h,body,head2)=>{ d.autoTable({...R,startY:y,head:[head2||[h,'']],body:P(body)}); y=d.lastAutoTable.finalY+1; };
-  sec('Core data',M.core); sec('Performance',M.perf); sec('Dimensions and bill of mass',M.wts);
-  d.addPage(); d.setTextColor(...ink); d.setFont('helvetica','bold'); d.setFontSize(11); d.text('Design checks',8,12);
-  d.autoTable({...base,startY:15,margin:{left:8,right:8},head:[['Check','Requirement','Obtained','Result']],body:P(M.checks.map(c=>[c.name,c.req,c.got,c.ok?'Pass':'Fail'])),didParseCell:(h)=>{ if(h.section==='body'&&h.column.index===3) h.cell.styles.textColor=h.cell.raw==='Pass'?[46,125,79]:[178,58,46]; }});
-  d.setFont('helvetica','bold'); d.setFontSize(11); d.text('Guarantees and factory test results',8,d.lastAutoTable.finalY+8);
-  d.autoTable({...base,startY:d.lastAutoTable.finalY+11,margin:{left:8,right:8},head:[['Item','Calculated','Guaranteed','Limit at test (IEC 60076-1)','Measured (FAT)','Result']],body:P(M.gt.map(r=>[r.item,r.calc,r.noG?'-':String(r.g),r.max,r.meas==null?'':String(r.meas),r.result]))});
-  // page 2
-  d.addPage(); d.setTextColor(...ink); d.setFont('helvetica','bold'); d.setFontSize(11); d.text('Step-by-step calculation',8,12);
-  d.autoTable({...base,startY:15,margin:{left:8,right:8},head:[['Step','Item','Working','Result']],body:M.steps.map(s=>[String(s.n),pdfText(s.title),pdfText(s.formula+(s.note?'  ['+s.note+']':'')),pdfText(s.result)]),
-    columnStyles:{0:{cellWidth:9,halign:'center'},1:{cellWidth:40,fontStyle:'bold'},3:{cellWidth:55,fontStyle:'bold'}},styles:{...base.styles,fontSize:6.8}});
-  y=d.lastAutoTable.finalY+3; if(y>150){ d.addPage(); y=12; }
-  d.autoTable({...base,startY:y,margin:{left:8,right:200},head:[['Step','Width, mm','Stack, mm','Net mm2']],body:M.coreSteps});
-  d.autoTable({...base,startY:y,margin:{left:102,right:120},head:[['Tap','Setting','HV volts','Turns']],body:P(M.taps)});
-  d.autoTable({...base,startY:y,margin:{left:182,right:8},head:[['Clearances','']],body:P(M.clr)});
+  const B=(fs)=>({theme:'grid',styles:{fontSize:fs,cellPadding:fs*0.1,lineColor:[150,160,170],lineWidth:0.15,textColor:ink},headStyles:{fillColor:head,textColor:ink,fontStyle:'bold'},columnStyles:{0:{fontStyle:'bold'}}});
+  const pass=(h,col)=>{ if(h.section==='body'&&h.column.index===col) h.cell.styles.textColor=h.cell.raw==='Pass'?[46,125,79]:[178,58,46]; };
+  const title=(d,t)=>{ d.setTextColor(...ink); d.setFont('helvetica','bold'); d.setFontSize(11); d.text(pdfText(t),8,12); };
+  // page 1: title block, winding data, core, performance, dimensions
+  const d=pdfFirstPage((fs)=>{ const d=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+    d.setDrawColor(...ink); d.setLineWidth(0.5); d.rect(8,8,281,27); d.setFont('helvetica','bold'); d.setFontSize(11); d.setTextColor(...ink); d.text(pdfText(M.title.title),10,13);
+    d.setFont('helvetica','normal'); d.setFontSize(6.4); M.title.cells.forEach((c,i)=>{ const x=10+(i%6)*46.5, y=18+Math.floor(i/6)*5.6; d.setTextColor(90); d.text(pdfText(c[0]),x,y); d.setTextColor(...ink); d.text(pdfText(c[1]).slice(0,40),x,y+2.6); });
+    d.autoTable({...B(fs),startY:38,margin:{left:8,right:150,bottom:9},head:[['Winding data','LV (inner)','HV (outer)']],body:P(M.wind),columnStyles:{0:{fontStyle:'bold',cellWidth:38}}});
+    let y=38; const sec=(h,body)=>{ d.autoTable({...B(fs),startY:y,margin:{left:152,right:8,bottom:9},head:[[h,'']],body:P(body)}); y=d.lastAutoTable.finalY+1; };
+    sec('Core data',M.core); sec('Performance',M.perf); sec('Dimensions and bill of mass',M.wts); return d; });
+  // page 2: checks and guarantees
+  d.addPage(); pdfFit(d,(fs)=>{ title(d,'Design checks');
+    d.autoTable({...B(fs),startY:15,margin:{left:8,right:8,bottom:9},head:[['Check','Requirement','Obtained','Result']],body:P(M.checks.map(c=>[c.name,c.req,c.got,c.ok?'Pass':'Fail'])),didParseCell:h=>pass(h,3)});
+    d.setFont('helvetica','bold'); d.setFontSize(11); d.text('Guarantees and factory test results',8,d.lastAutoTable.finalY+8);
+    d.autoTable({...B(fs),startY:d.lastAutoTable.finalY+11,margin:{left:8,right:8,bottom:9},head:[['Item','Calculated','Guaranteed','Limit at test (IEC 60076-1)','Measured (FAT)','Result']],body:P(M.gt.map(r=>[r.item,r.calc,r.noG?'-':String(r.g),r.max,r.meas==null?'':String(r.meas),r.result])),didParseCell:h=>pass(h,5)}); });
+  // page 3+: steps, then core steps, taps and clearances
+  d.addPage(); pdfFit(d,(fs)=>{ title(d,'Step-by-step calculation');
+    d.autoTable({...B(fs),startY:15,margin:{left:8,right:8,bottom:9},head:[['Step','Item','Working','Result']],body:M.steps.map(s=>[String(s.n),pdfText(s.title),pdfText(s.formula+(s.note?'  ['+s.note+']':'')),pdfText(s.result)]),
+      columnStyles:{0:{cellWidth:9,halign:'center'},1:{cellWidth:40,fontStyle:'bold'},3:{cellWidth:58,fontStyle:'bold'}}});
+    let y=d.lastAutoTable.finalY+3; if(y>150){ d.addPage(); y=12; }
+    d.autoTable({...B(fs),startY:y,margin:{left:8,right:200,bottom:9},head:[['Step','Width, mm','Stack, mm','Net mm2']],body:M.coreSteps});
+    d.autoTable({...B(fs),startY:y,margin:{left:102,right:120,bottom:9},head:[['Tap','Setting','HV volts','Turns']],body:P(M.taps)});
+    d.autoTable({...B(fs),startY:y,margin:{left:182,right:8,bottom:9},head:[['Clearances','']],body:P(M.clr)}); },[6.8,6.3,5.8,5.4]);
   const n=d.getNumberOfPages(); for(let i=1;i<=n;i++){ d.setPage(i); d.setFontSize(6); d.setTextColor(90); d.text(pdfText('Round core design, '+CUR.o.inp.kVA+' kVA  |  Rev '+(CUR.meta.rev||'R0')+'  |  Tool '+APP_VERSION+'  |  Estimated values marked (est.)  |  Page '+i+' of '+n+'  |  Generated '+new Date().toLocaleString('en-GB')),8,205); }
   saveFile(fname('pdf'),d.output('blob'));
 });
@@ -1499,7 +1538,7 @@ function rRender(o,M){
 }
 function rSVG(o){
   const W=o.W, L=o.limb, Cd=o.Cd, Y=W; const FW=2*Cd+W, FH=L+2*Y; const gapX=120; const planW=o.OD2w+20, planH=o.OD2d+20;
-  const pad=Math.max(30,(o.OD2w-W)/2+20), vbW=FW+gapX+planW+2*pad, vbH=Math.max(FH,planH)+2*pad+30; const fs=Math.max(12,vbW/70);
+  const pad=Math.max(30,(o.OD2w-W)/2+20), vbW=FW+gapX+planW+2*pad, vbH=Math.max(FH,planH)+2*pad+30; const fs=Math.max(14,vbW/42);
   const x0=pad, y0=pad+20;
   let s='<svg viewBox="0 0 '+vbW+' '+vbH+'" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Front view of core and coils and plan view of one limb" font-family="Barlow, Arial" font-size="'+fs+'" style="color:var(--ink)">';
   s+='<rect x="'+x0+'" y="'+y0+'" width="'+FW+'" height="'+FH+'" fill="#A3ADB6"/>';
@@ -1558,27 +1597,33 @@ $('#reqFile').addEventListener('change',async e=>{
 function rfname(ext){ const p=RCUR.o.p; return 'RectCore_'+p.kVA+'kVA_'+p.priV+'-'+p.secV+'V_'+p.mat+'_'+p.vg+'.'+ext; }
 $('#rPdf').addEventListener('click',()=>{
   if(!RCUR) return; if(!window.jspdf){ toast('PDF library did not load. Reload the page.'); return; }
-  const {jsPDF}=window.jspdf; const d=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'}); const M=RCUR.M; const P=v=>v.map(r=>r.map(pdfText)); const ink=[23,33,43];
-  const base={theme:'grid',styles:{fontSize:6.8,cellPadding:0.8,lineColor:[150,160,170],lineWidth:0.15,textColor:ink},headStyles:{fillColor:[228,233,238],textColor:ink,fontStyle:'bold'},columnStyles:{0:{fontStyle:'bold'}}};
-  d.setDrawColor(...ink); d.setLineWidth(0.5); d.rect(8,8,281,30); d.setFont('helvetica','bold'); d.setFontSize(11); d.text(pdfText(M.title.title),10,13);
-  d.setFont('helvetica','normal'); d.setFontSize(6.4); M.title.cells.forEach((c,i)=>{ const x=10+(i%8)*35, y=18+Math.floor(i/8)*6.5; d.setTextColor(90); d.text(pdfText(c[0]),x,y); d.setTextColor(...ink); d.text(pdfText(c[1]).slice(0,34),x,y+2.7); });
-  d.autoTable({...base,styles:{...base.styles,fontSize:6,cellPadding:0.5},startY:41,margin:{left:8,right:140},head:[P([['Parameter',M.wind[0][1],M.wind[0][2]]])[0]],body:P(M.wind.slice(1)),columnStyles:{0:{fontStyle:'bold',cellWidth:52}}});
-  let y=41; const R={...base,styles:{...base.styles,fontSize:6,cellPadding:0.5},margin:{left:161,right:8}}; const sec=(h,b)=>{ d.autoTable({...R,startY:y,head:[[h,'']],body:P(b),columnStyles:{0:{fontStyle:'bold',cellWidth:48}}}); y=d.lastAutoTable.finalY+1; };
-  sec('Core',M.core); sec('Impedance voltage',M.imp); sec('Losses and efficiency',M.loss); sec('Mechanical details',M.mech);
-  d.addPage(); d.setFont('helvetica','bold'); d.setFontSize(11); d.setTextColor(...ink); d.text(pdfText('Compliance with requirement — '+REQ_NAME),8,12);
-  d.autoTable({...base,startY:15,margin:{left:8,right:8},head:[['#','Parameter','Specification','Offered / design value','Status']],body:P(M.comp.map(r=>r.slice(0,5))),
-    columnStyles:{0:{cellWidth:7},1:{cellWidth:70,fontStyle:'bold'},2:{cellWidth:70},4:{cellWidth:18,fontStyle:'bold'}},
-    didParseCell:(h)=>{ if(h.section==='body'&&h.column.index===4) h.cell.styles.textColor=(h.cell.raw==='Complies'||h.cell.raw==='Confirmed')?[46,125,79]:(h.cell.raw==='To confirm'?[154,107,0]:[178,58,46]); }});
-  y=d.lastAutoTable.finalY+3; if(y>150){ d.addPage(); y=12; }
-  d.autoTable({...base,startY:y,margin:{left:8,right:150},head:[['Check','Requirement','Obtained','Result']],body:P(M.checks.map(c=>[c.name,c.req,c.got,c.ok?'Pass':'Fail']))});
-  const yb=d.lastAutoTable.finalY+3;
-  d.autoTable({...base,startY:yb,margin:{left:8,right:150},head:[['Core and coil build-up','']],body:P(M.build)});
-  d.autoTable({...base,startY:y,margin:{left:152,right:8},head:[['#','Item','kg','Rs/kg','Rs']],body:P(M.bom),columnStyles:{2:{halign:'right'},3:{halign:'right'},4:{halign:'right'}}});
-  d.addPage(); d.setFont('helvetica','bold'); d.setFontSize(11); d.setTextColor(...ink); d.text('Guarantees and factory test results',8,12);
-  d.autoTable({...base,startY:15,margin:{left:8,right:8},head:[['Item','Calculated','Guaranteed','Limit at test (IEC 60076-1)','Measured (FAT)','Result']],body:P(M.gt.map(r=>[r.item,r.calc,r.noG?'-':String(r.g),r.max,r.meas==null?'':String(r.meas),r.result])),
-    didParseCell:(h)=>{ if(h.section==='body'&&h.column.index===5) h.cell.styles.textColor=h.cell.raw==='Pass'?[46,125,79]:[178,58,46]; }});
-  d.setFont('helvetica','bold'); d.setFontSize(11); d.text('Step-by-step calculation',8,d.lastAutoTable.finalY+8);
-  d.autoTable({...base,styles:{...base.styles,fontSize:6.5,cellPadding:0.7},startY:d.lastAutoTable.finalY+11,margin:{left:8,right:8},head:[['#','Item','Working','Result']],body:P(M.steps.map((s,i)=>[String(i+1),...s])),columnStyles:{0:{cellWidth:7},1:{cellWidth:38,fontStyle:'bold'},3:{cellWidth:66,fontStyle:'bold'}}});
+  const {jsPDF}=window.jspdf; const M=RCUR.M; const P=v=>v.map(r=>r.map(pdfText)); const ink=[23,33,43];
+  const B=(fs)=>({theme:'grid',styles:{fontSize:fs,cellPadding:fs*0.1,lineColor:[150,160,170],lineWidth:0.15,textColor:ink},headStyles:{fillColor:[228,233,238],textColor:ink,fontStyle:'bold'},columnStyles:{0:{fontStyle:'bold'}}});
+  const col=(h,i,map)=>{ if(h.section==='body'&&h.column.index===i) h.cell.styles.textColor=map(h.cell.raw); };
+  const okc=v=>(v==='Pass'||v==='Complies'||v==='Confirmed')?[46,125,79]:(v==='To confirm'?[154,107,0]:(v?[178,58,46]:ink));
+  const title=(d,t,y)=>{ d.setTextColor(...ink); d.setFont('helvetica','bold'); d.setFontSize(11); d.text(pdfText(t),8,y||12); };
+  // page 1: title block + winding data (left) + core, impedance, losses, mechanical (right)
+  const d=pdfFirstPage((fs)=>{ const d=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+    d.setDrawColor(...ink); d.setLineWidth(0.5); d.rect(8,8,281,30); d.setFont('helvetica','bold'); d.setFontSize(11); d.setTextColor(...ink); d.text(pdfText(M.title.title),10,13);
+    d.setFont('helvetica','normal'); d.setFontSize(6.2); M.title.cells.forEach((c,i)=>{ const x=10+(i%8)*35, y=18+Math.floor(i/8)*6.5; d.setTextColor(90); d.text(pdfText(c[0]),x,y); d.setTextColor(...ink); d.text(pdfText(c[1]).slice(0,34),x,y+2.7); });
+    d.autoTable({...B(fs),startY:41,margin:{left:8,right:140,bottom:9},head:[P([['Parameter',M.wind[0][1],M.wind[0][2]]])[0]],body:P(M.wind.slice(1)),columnStyles:{0:{fontStyle:'bold',cellWidth:52}}});
+    let y=41; const sec=(h,b)=>{ d.autoTable({...B(fs),startY:y,margin:{left:161,right:8,bottom:9},head:[[h,'']],body:P(b),columnStyles:{0:{fontStyle:'bold',cellWidth:48}}}); y=d.lastAutoTable.finalY+1; };
+    sec('Core',M.core); sec('Impedance voltage',M.imp); sec('Losses and efficiency',M.loss); sec('Mechanical details',M.mech); return d; });
+  // page 2: compliance
+  d.addPage(); pdfFit(d,(fs)=>{ title(d,'Compliance with requirement — '+REQ_NAME);
+    d.autoTable({...B(fs),startY:15,margin:{left:8,right:8,bottom:9},head:[['#','Parameter','Specification','Offered / design value','Status']],body:P(M.comp.map(r=>r.slice(0,5))),
+      columnStyles:{0:{cellWidth:7},1:{cellWidth:70,fontStyle:'bold'},2:{cellWidth:70},4:{cellWidth:18,fontStyle:'bold'}},didParseCell:h=>col(h,4,okc)}); });
+  // page 3: design checks + build-up (left), BOM (right)
+  d.addPage(); pdfFit(d,(fs)=>{ const p0=d.getNumberOfPages(); title(d,'Design checks, build-up and bill of materials');
+    d.autoTable({...B(fs),startY:15,margin:{left:8,right:150,bottom:9},head:[['Check','Requirement','Obtained','Result']],body:P(M.checks.map(c=>[c.name,c.req,c.got,c.ok?'Pass':'Fail'])),didParseCell:h=>col(h,3,okc)});
+    d.autoTable({...B(fs),startY:d.lastAutoTable.finalY+3,margin:{left:8,right:150,bottom:9},head:[['Core and coil build-up','']],body:P(M.build)});
+    d.setPage(p0);
+    d.autoTable({...B(fs),startY:15,margin:{left:152,right:8,bottom:9},head:[['#','Item','kg','Rs/kg','Rs']],body:P(M.bom),columnStyles:{2:{halign:'right'},3:{halign:'right'},4:{halign:'right'}}}); });
+  // page 4+: guarantees and tests, then steps
+  d.addPage(); pdfFit(d,(fs)=>{ title(d,'Guarantees and factory test results');
+    d.autoTable({...B(fs),startY:15,margin:{left:8,right:8,bottom:9},head:[['Item','Calculated','Guaranteed','Limit at test (IEC 60076-1)','Measured (FAT)','Result']],body:P(M.gt.map(r=>[r.item,r.calc,r.noG?'-':String(r.g),r.max,r.meas==null?'':String(r.meas),r.result])),didParseCell:h=>col(h,5,okc)});
+    title(d,'Step-by-step calculation',d.lastAutoTable.finalY+8);
+    d.autoTable({...B(fs),startY:d.lastAutoTable.finalY+11,margin:{left:8,right:8,bottom:9},head:[['#','Item','Working','Result']],body:P(M.steps.map((s,i)=>[String(i+1),...s])),columnStyles:{0:{cellWidth:7},1:{cellWidth:38,fontStyle:'bold'},3:{cellWidth:66,fontStyle:'bold'}}}); },[6.5,6,5.6,5.3]);
   const n=d.getNumberOfPages(); for(let i=1;i<=n;i++){ d.setPage(i); d.setFontSize(6); d.setTextColor(90); d.text(pdfText('Rect core design, '+RCUR.o.p.kVA+' kVA  |  Rev '+(RCUR.meta.rev||'R0')+'  |  Tool '+APP_VERSION+'  |  Page '+i+' of '+n+'  |  Generated '+new Date().toLocaleString('en-GB')),8,205); }
   saveFile(rfname('pdf'),d.output('blob'));
 });
