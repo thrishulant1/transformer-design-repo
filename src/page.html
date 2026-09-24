@@ -121,6 +121,12 @@ details.sec:not([open])>summary{margin-bottom:0}
 @media (prefers-reduced-motion:reduce){details.sec>summary::before{transition:none}}
 .grid2>label,.grid4>label{min-width:0}
 label b{white-space:normal}
+.invalid{border-color:var(--bad)!important;box-shadow:0 0 0 2px rgba(178,58,46,.28)}
+.inputcheck{display:none;margin:0 0 14px;padding:10px 14px;border-left:4px solid var(--bad);background:var(--warnbg)}
+.inputcheck.on{display:block}.inputcheck.warn{border-left-color:#C08A1E;background:rgba(192,138,30,.12)}
+.inputcheck ul{margin:4px 0 0;padding-left:18px}.inputcheck .sub{margin:6px 0 0;font-size:13px;color:var(--ink2)}
+.stale{opacity:.4;filter:grayscale(.6);transition:opacity .15s}
+@media (prefers-reduced-motion:reduce){.stale{transition:none}}
 </style>
 </head>
 <body>
@@ -253,6 +259,7 @@ label b{white-space:normal}
       <button class="btn" id="dlXlsx">Download Excel</button>
     </div>
   </div>
+  <div class="inputcheck" id="inputCheck" role="alert"></div>
   <div class="kpis" id="kpis"></div>
   <div class="warns" id="warns"><strong>Check these before release</strong><ul></ul></div>
   <p class="okline" id="okline">All checks pass: flux, current densities, gradients and impedance are within limits.</p>
@@ -452,7 +459,7 @@ function roundDrawing(o,print){ const P=drwPal(print), c=o.core, lv=o.lv, hv=o.h
   return DRW.svgOpen(W_,H_+fs*0.6,P,fs,'Round core: plan through the windings and section through one limb, dimensioned in millimetres')+s+'</svg>'; }
 function renderSVG(o){ $('#svgwrap').innerHTML=roundDrawing(o,false); }
 function run(){
-  if(!form.kVA.value||!form.hvV.value||!form.lvV.value){ return; }
+  if(!showInputCheck('#inputCheck','#kpis, #warns, #okline, #tab-sheet, #tab-checks, #tab-steps',validateForm(form,ROUND_RULES,roundCross))) return;
   try{ const {p,meta}=readInputs(); const o=designAuto(p); const M=buildModel(o,meta); CUR={o,M,meta}; renderKpis(o); renderSheet(M); renderSVG(o); renderChecks(o,M);
     $('#fixRound').hidden=!(o.auto&&(o.auto.window||o.auto.layers||o.auto.lvDucts||o.auto.hvDucts)); }
   catch(e){ console.error(e); $('#warns').classList.add('on'); $('#warns ul').innerHTML='<li>These inputs cannot be designed: '+esc(e.message)+'. Check the voltages and advanced fields.</li>'; }
@@ -496,7 +503,7 @@ function pdfFit(d,draw,fonts){ fonts=fonts||[7,6.5,6,5.6,5.3]; const start=d.get
 function pdfFirstPage(make,fonts){ fonts=fonts||[6.4,6,5.6,5.3]; let d=null;
   for(const fs of fonts){ d=make(fs); if(d.getNumberOfPages()===1) return d; } return d; }
 $('#dlPdf').addEventListener('click',async()=>{
-  if(!CUR) return; if(!window.jspdf){ toast('PDF library did not load. Check your connection and reload.'); return; }
+  if(!CUR) return; if($('#inputCheck').classList.contains('err')){ toast('Fix the highlighted inputs first.'); return; } if(!window.jspdf){ toast('PDF library did not load. Check your connection and reload.'); return; }
   const png=await svgToPng(roundDrawing(CUR.o,true),2800);
   const {jsPDF}=window.jspdf; const M=CUR.M; const P=v=>v.map(r=>r.map(pdfText));
   const ink=[23,33,43], head=[228,233,238];
@@ -528,7 +535,7 @@ $('#dlPdf').addEventListener('click',async()=>{
   saveFile(fname('pdf'),d.output('blob'));
 });
 $('#dlXlsx').addEventListener('click',()=>{
-  if(!CUR) return; if(!window.XLSX){ toast('Excel library did not load. Check your connection and reload.'); return; }
+  if(!CUR) return; if($('#inputCheck').classList.contains('err')){ toast('Fix the highlighted inputs first.'); return; } if(!window.XLSX){ toast('Excel library did not load. Check your connection and reload.'); return; }
   const M=CUR.M, wb=XLSX.utils.book_new();
   const a=[[M.title.title],[],...M.title.cells,[],['WINDING DATA','LV (inner)','HV (outer)'],...M.wind,[],['CORE DATA'],...M.core,[],['PERFORMANCE'],...M.perf,[],['CLEARANCES'],...M.clr,[],['DIMENSIONS AND BILL OF MASS'],...M.wts];
   const ws=XLSX.utils.aoa_to_sheet(a); ws['!cols']=[{wch:34},{wch:30},{wch:40}]; XLSX.utils.book_append_sheet(wb,ws,'Design sheet');

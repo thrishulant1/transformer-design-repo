@@ -1,4 +1,4 @@
-# Dry-type transformer design calculator — v1.2.0
+# Dry-type transformer design calculator — v1.2.1
 
 A web app with two design modules:
 
@@ -23,14 +23,18 @@ src/                 ← edit these files
   engine-rect.js       rectangular-core calculation
   guarantees.js        guarantees and FAT test comparison
   drawing.js           dimensioned drawings, drawing page in the PDF
+  validation.js        input checks (limits and messages for every field)
   ui-rect.js           rectangular-core screens, library, exports
-tools/build.py       joins src/ into index.html
-index.html           the built app (do not edit by hand)
+lib/                 PDF and Excel libraries (jsPDF 2.5.1, jsPDF-AutoTable 3.8.2, SheetJS 0.18.5), built into index.html
+tools/build.py       joins src/ and lib/ into index.html
+index.html           the built app, works offline (do not edit by hand)
 tests/regression.js  45 checks against the reference designs
 supabase.sql         optional shared design library
 ```
 
 **The one rule: edit `src/`, never `index.html`.**
+
+`index.html` contains everything, including the PDF and Excel libraries, so it also works with no internet: copy it to a laptop and double-click it. Only the web font needs the internet; without it the page uses Arial. `python tools/build.py --cdn` makes a smaller file that loads the libraries from the internet instead.
 
 1. Change a file in `src/`.
 2. Run `python tools/build.py`. It rewrites `index.html`.
@@ -79,6 +83,16 @@ File names: `{work order or party}_{RECT|ROUND}_{kVA}kVA_{HV}-{LV}V_{revision}_{
 | Excel | CAL1, Compliance, BOM, Steps, Values (numbers), Guarantees & tests, Inputs (reloadable) | Design sheet, Steps, Core steps, Taps, Checks, Values, Guarantees & tests, Inputs |
 
 ## What changed
+
+**v1.2.1**
+- **Input checks:** every field has limits. Impossible entries (0 kVA, negative clearances, a strip with only one dimension, more layers than turns, HV not above LV in the round core, a missing supplier conductivity) are outlined in red with a plain message; the results are dimmed and PDF/Excel downloads wait until they are fixed.
+- **Unusual but valid entries** are shown as warnings and the design still runs, for example:
+  - equal voltages, which are normal for isolation transformers
+  - flux above 1.6 T
+  - a strip that looks swapped
+  - tap ranges that are not whole steps
+  - odd core proportions
+- **Works offline:** the PDF and Excel libraries are built into `index.html`.
 
 **v1.2.0**
 - **IEC 60076-5 Table 1:** warns when impedance is below the recognised minimum (4 % up to 630 kVA): short-circuit withstand is then by agreement, and a duration below 2 s may be agreed when the fault current exceeds 25 × rated.
@@ -160,6 +174,16 @@ In VS Code press **Ctrl+Shift+F**, search for the text in the middle column, edi
 | Drawing | `function roundDrawing` | `src/page.html` |
 | PDF layout | `$('#dlPdf')` | `src/page.html` |
 | File names (both modules) | `function designFileName` | `src/page.html` |
+
+### Input checks
+| What | Search for | File |
+|---|---|---|
+| Limits for rectangular-core fields | `const RECT_RULES=` | `src/validation.js` |
+| Cross-field checks, rectangular core | `function rectCross` | `src/validation.js` |
+| Limits for round-core fields | `const ROUND_RULES=` | `src/validation.js` |
+| Cross-field checks, round core | `function roundCross` | `src/validation.js` |
+
+Each rule is one line: `POS('kVA','Rating','kVA',{req:true,max:5000})` means "required, above 0, at most 5000". Add `warn:v=>...` to show a warning without blocking.
 
 ### Shared
 | What | Search for | File |

@@ -1,5 +1,5 @@
 // ===== Shared standards helpers (used by both engines) =====
-const APP_VERSION='1.2.0 (23 Sep 2026)';
+const APP_VERSION='1.2.1 (23 Sep 2026)';
 const STD={};
 // Resistivity at 20 °C (Ω·mm²/m) and temperature constant: Cu 100 % IACS, EC aluminium 61 % IACS
 STD.RHO={Cu:{r20:0.017241,k:234.5},Al:{r20:0.028264,k:225}};

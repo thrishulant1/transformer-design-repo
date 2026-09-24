@@ -60,7 +60,8 @@ function rAutoAsync(p){ return new Promise((resolve,reject)=>{ const w=rWorkerGe
   w.addEventListener('message',h); try{ w.postMessage({id,p}); }catch(e){ done=true; clearTimeout(to); w.removeEventListener('message',h); rWorkerOk=false; try{ resolve(rectAuto(p)); }catch(e2){ reject(e2); } } }); }
 let rRunSeq=0;
 function rRun(){
-  const {p,manual,meta}=rInputs(); if(!p.kVA||!p.priV||!p.secV||!p.zTarget) return;
+  if(!showInputCheck('#rInputCheck','#rKpis, #rWarns, #rOk, #rtab-sheet, #rtab-comp, #rtab-tests, #rtab-steps',validateForm(rform,RECT_RULES,(v,b,w)=>rectCross(v,b,w,rform)))){ ++rRunSeq; $('#rAutoNote').textContent=''; return; }
+  const {p,manual,meta}=rInputs();
   const seq=++rRunSeq; $('#rAutoNote').textContent=manual?'Calculating…':'Designing automatically…';
   const t0=performance.now();
   const job=manual?Promise.resolve().then(()=>rectDesign(p)):rAutoAsync(p);
@@ -322,7 +323,7 @@ $('#reqFile').addEventListener('change',async e=>{
 // exports
 function rfname(ext){ const p=RCUR.o.p, m=RCUR.meta; return designFileName(m.wo||m.party,'RECT',p.kVA,Math.max(p.priV,p.secV),Math.min(p.priV,p.secV),m.rev,ext); }
 $('#rPdf').addEventListener('click',async()=>{
-  if(!RCUR) return; if(!window.jspdf){ toast('PDF library did not load. Reload the page.'); return; }
+  if(!RCUR) return; if($('#rInputCheck').classList.contains('err')){ toast('Fix the highlighted inputs first.'); return; } if(!window.jspdf){ toast('PDF library did not load. Reload the page.'); return; }
   const png=await svgToPng(rDrawing(RCUR.o,true),2800);
   const {jsPDF}=window.jspdf; const M=RCUR.M; const P=v=>v.map(r=>r.map(pdfText)); const ink=[23,33,43];
   const B=(fs)=>({theme:'grid',styles:{fontSize:fs,cellPadding:fs*0.1,lineColor:[150,160,170],lineWidth:0.15,textColor:ink},headStyles:{fillColor:[228,233,238],textColor:ink,fontStyle:'bold'},columnStyles:{0:{fontStyle:'bold'}}});
@@ -356,7 +357,7 @@ $('#rPdf').addEventListener('click',async()=>{
   saveFile(rfname('pdf'),d.output('blob'));
 });
 $('#rXlsx').addEventListener('click',()=>{
-  if(!RCUR) return; if(!window.XLSX){ toast('Excel library did not load. Reload the page.'); return; }
+  if(!RCUR) return; if($('#rInputCheck').classList.contains('err')){ toast('Fix the highlighted inputs first.'); return; } if(!window.XLSX){ toast('Excel library did not load. Reload the page.'); return; }
   const M=RCUR.M, wb=XLSX.utils.book_new(); const cols=(ws,w)=>{ws['!cols']=w.map(x=>({wch:x}));return ws;};
   const a=[[M.title.title],[],...M.title.cells,[],['WINDING DATA','',''],['Parameter',M.wind[0][1],M.wind[0][2]],...M.wind.slice(1),[],['CORE AND COIL BUILD-UP'],...M.build,[],['CORE'],...M.core,[],['IMPEDANCE VOLTAGE'],...M.imp,[],['LOSSES AND EFFICIENCY'],...M.loss,[],['MECHANICAL DETAILS'],...M.mech];
   XLSX.utils.book_append_sheet(wb,cols(XLSX.utils.aoa_to_sheet(a),[36,34,34]),'CAL1');
