@@ -177,7 +177,7 @@ function design(p){
   const x=Math.PI*hMean/delta; const kr=1-(1-Math.exp(-x))/x; const Ls=hMean/kr;
   const Dg=lvOD+g, D1=(lvID+lvOD)/2, D2=(hvID+hvOD)/2; const sumATD=(Dg*g+(D1*b1+D2*b2)/3)/100; // cm²
   const ex=1.24e-3*(f/50)*AT*sumATD/(vt*Ls/10);
-  const LLtot=lvLL+hvLL, LLmin=lvLL*1+hvLLmin; const er=LLtot/(kVA*10); const ek=Math.sqrt(ex*ex+er*er);
+  const lead=p.leadLoss||0; const LLtot=lvLL+hvLL+lead, LLmin=lvLL+hvLLmin+lead; const er=LLtot/(kVA*10); const ek=Math.sqrt(ex*ex+er*er);
   S(43,'Impedance','ex = 1.24×10⁻³ × (f/50) × AT × ΣD·a ÷ (V/T × Ls); AT = '+Math.round(AT)+', Ls = '+r1(hMean/10,2)+' ÷ '+r1(kr,3)+' = '+r1(Ls/10,2)+' cm, ΣD·a = '+r1(sumATD,2)+' cm²', 'ex = '+r1(ex,3)+' %, er = '+r1(er,3)+' %, ez = '+r1(ek,3)+' %');
   if(p.zTarget){ const dz=(ek-p.zTarget)/p.zTarget*100; if(Math.abs(dz)>10) out.warn.push('Impedance '+r1(ek,2)+' % is '+r1(dz,1)+' % from the '+p.zTarget+' % target (IS 2026 tolerance ±10 %). Adjust window height, k or LV–HV gap.'); }
   // ====== Enclosure & weights ======
@@ -209,7 +209,9 @@ function design(p){
   const matCost=costRows.reduce((a,r)=>a+r[1]*r[2],0), costOthers=matCost*pr.others/100;
   const loss50=NLL+0.25*LLtot;
   out.ratio={err:rerr,lim:ratioLim}; out.nl={vakg,vacm,vaCore,vaJoint,VA,I0}; out.sc=scRes; out.noise=noise; out.riseLim=riseLim;
-  out.cost={rows:costRows,mat:matCost,others:costOthers,total:matCost+costOthers}; out.loss.total50=loss50;
+  out.cost={rows:costRows,mat:matCost,others:costOthers,total:matCost+costOthers}; out.loss.total50=loss50; out.loss.lead=lead;
+  out.toc=STD.toc(out.cost.total,NLL,LLtot,p.capA,p.capB);
+  out.cut=STD.cutList(core.steps,Hw,CD,p.sf);
   S(46,'Ratio error','(V ratio − N ratio) ÷ V ratio; limit = lower of 0.5 % and Z/10 (IEC 60076-1)', r1(rerr,3)+' % (limit '+r1(ratioLim,3)+' %)');
   S(47,'No-load current','core mass × VA/kg × '+(p.vaBuild||1.3)+' + 6 joints × VA/cm² × area', r1(VA,0)+' VA = '+r1(I0,3)+' %');
   S(48,'Short circuit','I_sc = I × 100 ÷ (Z + Z_system), system '+(faultUsed?faultUsed+' MVA'+(p.faultMVA==null?' (IS 2026-5 Table 2 default)':''):'infinite')+'; θ₁ per IEC 60076-5 after '+(p.scTime||2)+' s', scRes.windings.map(w=>w.name+' '+r1(w.th1,0)+' °C').join(', '));
@@ -218,6 +220,8 @@ function design(p){
   chk('Turns-ratio error (IEC 60076-1)','≤ '+r1(ratioLim,3)+' %',r1(rerr,3)+' %',Math.abs(rerr)<=ratioLim+1e-9);
   chk('LV / HV winding rise','≤ '+r1(riseLim,1)+' K (class '+p.insClass+(riseLim<out.rise?', altitude '+p.altitude+' m':'')+')',r1(lvGrad,1)+' / '+r1(hvGrad,1)+' K',Math.max(lvGrad,hvGrad)<=riseLim);
   chk('Flux density','≤ 1.70 T',r1(Bact,3)+' T',Bact<=1.70);
+  { const ov=STD.overflux(Bact,p.ovPct??10,p.bSat||1.9); out.overflux=ov; chk('Flux at '+(p.ovPct??10)+' % over-voltage','≤ '+(p.bSat||1.9)+' T',r1(ov.Bov,3)+' T',ov.ok); }
+  if(p.llTarget){ const tol=p.llTol??5; const dev=(LLtot-p.llTarget)/p.llTarget*100; out.llDev=dev; chk('Load loss target','≤ '+p.llTarget+' W (tolerance −'+tol+' %)',Math.round(LLtot)+' W ('+(dev>=0?'+':'')+r1(dev,1)+' %)',dev<=0.0001&&dev>=-tol); }
   const jmx=(m)=>m==='Cu'?3.0:1.8; chk('Current density LV / HV (lowest tap)','≤ '+jmx(p.lvMat)+' / '+jmx(p.hvMat)+' A/mm²',r1(Jlv,2)+' / '+r1(Jmin,2),Jlv<=jmx(p.lvMat)&&Jmin<=jmx(p.hvMat));
   for(const w of scRes.windings) chk('Short-circuit thermal, '+w.name,'≤ '+w.lim+' °C after '+scRes.t+' s (IEC 60076-5)',r1(w.th1,0)+' °C',w.thermalOk);
   chk('Short-circuit hoop stress, HV (tensile)','≤ '+scRes.windings[1].stressLim+' MPa (0.9 × Rp0.2)',r1(scRes.windings[1].sigma,1)+' MPa',scRes.windings[1].stressOk);
@@ -243,9 +247,12 @@ function designAuto(p){
   const wins=p.window?[p.window]:(()=>{const a=[];for(let w=Math.round(D*2.2/5)*5;w<=Math.round(D*6.5/5)*5;w+=10)a.push(w);return a;})();
   const layerOpts=p.lvLayers?[p.lvLayers]:[2,4,3,6];
   const target=p.zTarget||null;
-  let best=null,bestScore=Infinity;
-  for(const w of wins) for(const L of layerOpts){
-    let q={...p,window:w,lvLayers:L}; let o=null;
+  // With a load-loss target, current densities are scaled to hit it (loss is roughly proportional to current density)
+  const jf=p.llTarget?[0.7,0.8,0.85,0.9,0.95,1,1.05,1.1,1.2]:[1];
+  const useToc=!!(p.capA||p.capB);
+  let best=null,bestScore=Infinity; const all=[];
+  for(const f of jf) for(const w of wins) for(const L of layerOpts){
+    let q={...p,window:w,lvLayers:L,Jlv:p.Jlv*f,Jhv:p.Jhv*f}; let o=null;
     const lvD=p.lvDucts!=null?[p.lvDucts]:Array.from({length:L},(_,i)=>i);
     for(const d of lvD){ o=design({...q,lvDucts:d}); if(o.lv.grad<=rise-5) { q.lvDucts=d; break; } q.lvDucts=d; }
     const hvD=p.hvDucts!=null?[p.hvDucts]:[0,1,2,3,4];
@@ -257,10 +264,18 @@ function designAuto(p){
     if(o.lv.grad>rise) sc+=20+(o.lv.grad-rise); if(o.hv.grad>rise) sc+=20+(o.hv.grad-rise);
     sc+= target? 10*Math.abs(o.imp.ek-target)/target : 0;
     if(Math.abs(o.ratio.err)>o.ratio.lim) sc+=5;
-    sc+= (q.lvDucts+q.hvDucts)*0.15 + (L-2)*0.1 + w/D*0.02 + o.loss.total/(p.kVA*1000)*5;
+    if(p.llTarget){ const tol=p.llTol??5, dev=(o.loss.LL-p.llTarget)/p.llTarget*100; if(dev>0) sc+=30+dev*3; else if(dev<-tol) sc+=10+(-tol-dev); }
+    sc+= (q.lvDucts+q.hvDucts)*0.15 + (L-2)*0.1 + w/D*0.02 + (useToc? o.toc/(p.kVA*1000)*0.5 : o.loss.total/(p.kVA*1000)*5);
+    o.score=sc; o.jf=f; all.push(o);
     if(sc<bestScore){bestScore=sc;best=o;}
   }
   best.auto={window:!p.window,layers:!p.lvLayers,lvDucts:p.lvDucts==null,hvDucts:p.hvDucts==null};
+  // Alternatives: the best designs that differ in window height by at least 30 mm or in LV layers
+  all.sort((a,b)=>a.score-b.score); const alts=[];
+  for(const o of all){ if(alts.length>=6) break; if(alts.some(a=>Math.abs(a.window-o.window)<30&&a.lv.layers===o.lv.layers)) continue; alts.push(o); }
+  best.alts=alts.map(o=>({score:o.score,window:o.window,layers:o.lv.layers,lvDucts:o.lv.ducts,hvDucts:o.hv.ducts,jf:o.jf,JlvT:o.inp.Jlv,JhvT:o.inp.Jhv,Jlv:o.lv.J,Jhv:o.hv.J,D:o.core.D,
+    ek:o.imp.ek,NLL:o.loss.NLL,LL:o.loss.LL,eff:o.loss.eff100,rise:Math.max(o.lv.grad,o.hv.grad),mass:o.wts.total,cost:o.cost.total,toc:o.toc,fails:o.checks.filter(c=>!c.ok).length}));
+  best.searched=all.length;
   return best;
 }
 const DEFAULTS={kVA:500,hvV:11000,lvV:415,hvConn:'D',lvConn:'Y',freq:50,lvMat:'Cu',hvMat:'Cu',insClass:'F',k:0.56,B:1.64,Jlv:2.0,Jhv:2.4,

@@ -141,7 +141,8 @@ function rectDesign(p){
     ID1w,ID1d,OD1w,OD1d,ID2w,ID2d,OD2w,OD2d,Cd,yokeL,winW,R:[R1,R2,R3,R4],P:[P1,P2,P3,P4],m1,mg,m2,sig:sig1,wire1,wire2,Rw1,Rw2,bare1,bare2,ins1,ins2,
     h,bb,kr,Ls,dP,st1,st2,LL1,LL2,tank,LL,er,ex,ek,coreMass,spec,NLL,vakg,vacm,mLimb,mYoke,mCorner,vaLimb,vaYoke,vaCorner,vaGap,VA,I0,extraNL,
     S1,S2,q1,q2,rise1,rise2,hal1:hal(q1,imp1),hal2:hal(q2,imp2),coreSa,wdgSa,mcly,aL,aB,aH,oL,oB,oH,bom,totMass,matCost,others,cost:matCost+others,rmc,eff,eff50,coreWdg,
-    J1:W1.Iph/C1.cs,J2:W2.Iph/C2.cs,ilReq1,ilReq2,sc,noise,riseLim,Kf});
+    J1:W1.Iph/C1.cs,J2:W2.Iph/C2.cs,ilReq1,ilReq2,sc,noise,riseLim,Kf,
+    toc:STD.toc(matCost+others,NLL,LL,p.capA,p.capB), cut:STD.cutList([{w:W,stack:D}],limb,Cd,sf)});
   // Compliance
   const zLo=p.zTarget*(1-p.zTolMinus/100), zHi=p.zTarget*(1+p.zTolPlus/100);
   o.zLo=zLo; o.zHi=zHi; o.ratioLim=STD.ratioLimit(ek);
@@ -153,6 +154,8 @@ function rectDesign(p){
   chk('Hot-spot vs insulation class',p.insClass+' ('+hsMax+' °C)',rnd(p.amb+Math.max(rise1,rise2)*1.1,0)+' °C est.',p.amb+Math.max(rise1,rise2)*1.1<=hsMax);
   chk('Turns-ratio error (IEC 60076-1)','≤ '+rnd(o.ratioLim,3)+' % (lower of 0.5 % and Z/10)',rnd(rerr,3)+' %',Math.abs(rerr)<=o.ratioLim+1e-9);
   chk('Flux density','≤ 1.55 T for low noise',rnd(Bact,3)+' T',Bact<=1.55);
+  { const ov=STD.overflux(Bact,p.ovPct??10,p.bSat||1.9); o.overflux=ov; chk('Flux at '+(p.ovPct??10)+' % over-voltage','≤ '+(p.bSat||1.9)+' T',rnd(ov.Bov,3)+' T',ov.ok); }
+  if(p.llTarget){ const tol=p.llTol??5, dev=(LL-p.llTarget)/p.llTarget*100; o.llDev=dev; chk('Load loss target','≤ '+p.llTarget+' W (tolerance −'+tol+' %)',Math.round(LL)+' W ('+(dev>=0?'+':'')+rnd(dev,1)+' %)',dev<=0.0001&&dev>=-tol); }
   chk('Noise (estimate, calibrate with a test)','≤ '+p.noiseMax+' dB',rnd(noise,1)+' dB',noise<=p.noiseMax);
   chk('Current density inner / outer',p.mat==='Al'?'≤ 1.8 A/mm² (Al)':'≤ 3.0 A/mm² (Cu)',rnd(o.J1,3)+' / '+rnd(o.J2,3),Math.max(o.J1,o.J2)<=(p.mat==='Al'?1.8:3.0));
   chk('Inter-layer insulation inner / outer','≥ '+rnd(ilReq1,3)+' / '+rnd(ilReq2,3)+' mm',p.lvIL+' / '+p.hvIL+' mm',p.lvIL>=ilReq1-1e-9&&p.hvIL>=ilReq2-1e-9);
@@ -191,17 +194,19 @@ function rcScore(o,p,d1){
   if(p.scRequired){ for(const w of o.sc.windings){ if(!w.thermalOk) s+=40+(w.th1-w.lim)*0.2; } if(!o.sc.windings[1].stressOk) s+=25; }
   // every other failed check costs 15
   for(const c of o.checks){ if(!c.ok&&/Flux|Noise|Current density|Hot-spot|Inter-layer/.test(c.name)) s+=15; }
-  s+= o.cost/(p.kVA*1000)*p.wCost + (o.NLL+o.LL)/(p.kVA*10)*p.wLoss + (d1+o.p.hvDucts)*0.3;
+  if(p.llTarget){ const tol=p.llTol??5, dev=(o.LL-p.llTarget)/p.llTarget*100; if(dev>0) s+=30+dev*3; else if(dev<-tol) s+=10+(-tol-dev); }
+  if(p.capA||p.capB) s+= o.toc/(p.kVA*1000)*p.wCost + (d1+o.p.hvDucts)*0.3;
+  else s+= o.cost/(p.kVA*1000)*p.wCost + (o.NLL+o.LL)/(p.kVA*10)*p.wLoss + (d1+o.p.hvDucts)*0.3;
   return s;
 }
 // One search pass. opt: {Ks, Lts, Jf (current-density factors)}
-function rectAuto1(p,opt){
+var rectAuto1=function(p,opt){
   const base={...p};
   const Ks=opt&&opt.Ks?opt.Ks:(p.K?[p.K]:[55,65,75,85,95,105]);
   const Lts=opt&&opt.Lts?opt.Lts:(()=>{const a=[];for(let L=100;L<=900;L+=20)a.push(L);return a;})();
   const Jfs=opt&&opt.Jf?opt.Jf:[1];
   const J10=p.J1||(p.mat==='Al'?1.4:2.3), J20=p.J2||(p.mat==='Al'?1.5:2.5);
-  let best=null,bestS=Infinity,count=0;
+  let best=null,bestS=Infinity,count=0; const cands=[];
   for(const K of Ks){
     const probe=rectDesign({...base,K,W:80,D:null,lvLayers:1,hvLayers:1,lvCond:{type:'strip',b:10,h:3,rad:1,ax:1},hvCond:{type:'strip',b:10,h:3,rad:1,ax:1},lvDucts:0,hvDucts:0});
     const N1=probe.N1,N2=probe.N2, I1=probe.W1.Iph, I2=probe.W2.Iph; const Areq=probe.Areq, sf=probe.sf;
@@ -217,24 +222,25 @@ function rectAuto1(p,opt){
           for(const d2 of (p.hvDucts!=null?[p.hvDucts]:[0,1,2])){
             o=rectDesign({...base,K,W,D:p.W?p.D:null,lvLayers:c1.L,hvLayers:c2.L,lvCond:c1.C,hvCond:c2.C,lvDucts:d1,hvDucts:d2,N1:probe.N1,N2:probe.N2}); count++;
             if(o.rise2<=o.riseLim) break; }
-          const s=rcScore(o,p,d1);
-          if(s<bestS){bestS=s;best=o;best._K=K;best._Lt=Lt;best._jf=jf;}
+          const s=rcScore(o,p,d1); o._s=s; o._K=K; o._Lt=Lt; o._jf=jf; cands.push(o); if(cands.length>120){ cands.sort((a,b)=>a._s-b._s); cands.length=40; }
+          if(s<bestS){bestS=s;best=o;}
           if(o.rise1<=o.riseLim) break; }
       }
     } }
   }
-  if(best){ best.searched=count; best.score=bestS; }
+  if(best){ best.searched=count; best.score=bestS; best._cands=cands; }
   return best;
-}
+};
 // Full automatic design: coarse pass (winding length step 20 mm), then a fine pass (step 10 mm, K ±5) around the best.
 // Flux density is searched when left blank (1.30 / 1.40 / 1.50 T, then ±0.05 T). Current density is lowered when
 // short-circuit withstand is required and cannot be met at the target densities.
-function rectAuto(p){
-  const scJ=p.scRequired&&!p.J1&&!p.J2; const Jc=scJ?[1,0.85,0.7]:[1];
+function rectAutoCore(p){
+  // Current density is searched when short-circuit withstand is required or a load-loss target is set (and no J is fixed)
+  const scJ=(p.scRequired||p.llTarget)&&!p.J1&&!p.J2; const Jc=p.llTarget&&!p.J1&&!p.J2?[1.2,1,0.85,0.7]:(scJ?[1,0.85,0.7]:[1]);
   const fine=(q,b)=>{ if(!b) return null; let n=b.searched;
     const Ks=q.K?[q.K]:[b._K-5,b._K,b._K+5].filter(k=>k>=40);
     const Lts=[]; for(let L=b._Lt-30;L<=b._Lt+30;L+=10) if(L>=80) Lts.push(L);
-    const Jf=scJ?[b._jf-0.05,b._jf,b._jf+0.05].filter(x=>x>0.4&&x<=1):[b._jf];
+    const Jf=scJ?[b._jf-0.1,b._jf-0.05,b._jf,b._jf+0.05,b._jf+0.1].filter(x=>x>0.4&&x<=(p.llTarget?1.3:1)):[b._jf];
     const f=rectAuto1(q,{Ks,Lts,Jf}); if(f){ n+=f.searched; if(f.score<b.score) b=f; } b.searched=n; return b; };
   if(p.B) return fine(p,rectAuto1(p,{Jf:Jc}));
   let best=null,n=0;
@@ -243,11 +249,24 @@ function rectAuto(p){
   let top=null; for(const B of [best.p.B-0.05,best.p.B,best.p.B+0.05]){ const q={...p,B:Math.round(B*100)/100}; const o=fine(q,rectAuto1(q,{Ks:[best._K],Jf:[best._jf]})); if(o){ n+=o.searched; if(!top||o.score<top.score) top=o; } }
   top.searched=n; top.autoB=true; return top;
 }
+// Wraps the search and adds up to six alternative designs (different core width, K or layers) for comparison
+function rectAuto(p){
+  const pool=[]; const _a1=rectAuto1; rectAuto1=(q,opt)=>{ const b=_a1(q,opt); if(b&&b._cands) pool.push(...b._cands); return b; };
+  let best; try{ best=rectAutoCore(p); } finally { rectAuto1=_a1; }
+  if(!best) return null;
+  pool.sort((a,b)=>a._s-b._s); const alts=[]; const sig=o=>o.W+'|'+o.p.K+'|'+o.L1+'|'+o.L2+'|'+o.p.B;
+  for(const o of [best,...pool]){ if(alts.length>=6) break; if(alts.some(a=>a.sig===sig(o))) continue;
+    alts.push({sig:sig(o),score:o._s??o.score,K:o.p.K,B:o.p.B,W:o.W,D:o.D,N1:o.N1,N2:o.N2,L1:o.L1,L2:o.L2,lvDucts:o.p.lvDucts,hvDucts:o.p.hvDucts,
+      C1:{type:o.C1.type,b:o.C1.b,h:o.C1.h,rad:o.C1.rad,ax:o.C1.ax},C2:{type:o.C2.type,b:o.C2.b,h:o.C2.h,rad:o.C2.rad,ax:o.C2.ax},
+      ek:o.ek,NLL:o.NLL,LL:o.LL,eff:o.eff,rise:Math.max(o.rise1,o.rise2),mass:o.totMass,cost:o.cost,toc:o.toc,fails:o.checks.filter(c=>!c.ok).length}); }
+  for(const o of [best,...pool]) delete o._cands;
+  best.alts=alts; return best;
+}
 const RC_DEFAULTS={kVA:70,freq:50,priV:433,priConn:'D',secV:400,secConn:'Y',vg:'Dyn11',mat:'Al',grade:'M4-27',insClass:'H',
   zTarget:3,zTolPlus:0,zTolMinus:10,effMin:97,riseLimit:115,amb:50,windTemp:115,noiseMax:50,basis:'sheet',condBasis:'sheet',sigmaCustom:null,
   K:79,B:1.4,W:80,D:null,plateW:0,plateD:4,gap:12,delta:12,am:15,lvEnd:40,hvEndMin:40,limb:null,Cdist:null,
   lvLayers:4,hvLayers:4,lvCond:{type:'strip',b:10.5,h:3.5,rad:1,ax:2},hvCond:{type:'strip',b:10.5,h:3.5,rad:1,ax:1},lvIns:0.11,hvIns:0.11,lvIL:0.13,hvIL:0.13,
   extraTurn:1,roundLen:false,lvDucts:0,hvDucts:0,lvDuctW:8,hvDuctW:8,lvAxDucts:0,hvAxDucts:0,lvTransp:0,hvTransp:0,lvComp:0,hvComp:0,bulge:1.1,
   tankWkVA:1.5,coreFactor:1.32,buildF:1.5,leads:0,clrL:250,clrB:260,clrTop:250,clrBot:75,enclosure:false,enclThk:2,
-  altitude:1000,faultMVA:null,scTime:2,scRequired:false,stressCu:80,stressAl:35,bonded:false,kFactor:1,riseCal1:1,riseCal2:1,noiseA:22,noiseB:35,Eb:10000,
+  altitude:1000,faultMVA:null,scTime:2,scRequired:false,ovPct:10,bSat:1.9,capA:null,capB:null,llTarget:null,llTol:5,stressCu:80,stressAl:35,bonded:false,kFactor:1,riseCal1:1,riseCal2:1,noiseA:22,noiseB:35,Eb:10000,
   price:{core:270,coreSteel:200,cond:440,leads:440,fg:500,connFg:500,clh:5950,resin:650,crca:90,others:15},wCost:1,wLoss:0.5};

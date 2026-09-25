@@ -54,6 +54,7 @@ const RECT_RULES=[
   NONNEG('clrL','Overall clearance L','mm'), NONNEG('clrB','Overall clearance B','mm'), POS('sigmaCustom','Conductivity','m/Ω·mm²',{max:70}),
   {n:'riseCal1',l:'Inner rise calibration',min:0.3,max:3}, {n:'riseCal2',l:'Outer rise calibration',min:0.3,max:3}, POS('stressCu','Copper stress limit','MPa',{max:500}), POS('stressAl','Aluminium stress limit','MPa',{max:500}),
   {n:'extraTurn',l:'Extra turn per layer',min:0,max:3},
+  POS('llTarget','Load loss target','W'), {n:'llTol',l:'Target tolerance',min:0,max:50,u:'%'}, NONNEG('capA','No-load capitalisation','₹/kW'), NONNEG('capB','Load capitalisation','₹/kW'), {n:'ovPct',l:'Over-voltage for flux check',min:0,max:30,u:'%'}, {n:'bSat',l:'Flux limit at over-voltage',min:1.5,max:2.1,u:'T'},
   NONNEG('pCore','Core price','₹/kg'), NONNEG('pCond','Conductor price','₹/kg'), NONNEG('pSteel','Steel price','₹/kg'), NONNEG('pFg','FG price','₹/kg'), NONNEG('pClh','Class H price','₹/kg'), NONNEG('pResin','Resin price','₹/kg'), {n:'pOthers',l:'Others',min:0,max:100,u:'%'}];
 function rectCross(val,bad,warns,formEl){
   const pv=val('priV'), sv=val('secV'); if(pv&&sv&&pv===sv) warns.push('Primary and secondary voltages are equal ('+pv+' V). This is correct for an isolation transformer; check it is intended.');
@@ -83,10 +84,59 @@ const ROUND_RULES=[
   NONNEG('lvhvGap','LV–HV gap','mm',{max:300}), NONNEG('phaseGap','HV phase gap','mm',{max:500}), NONNEG('hvCoilGap','HV coil-to-coil gap','mm',{max:200}),
   NONNEG('hvMinIns','HV inter-layer minimum','mm',{max:5}), NONNEG('lvIns','LV conductor insulation','mm',{max:5}), NONNEG('hvInsRound','HV round insulation','mm',{max:5}), NONNEG('hvInsStrip','HV strip insulation','mm',{max:5}),
   NONNEG('enclClr','Enclosure clearance','mm',{max:2000}), {n:'riseCal1',l:'LV rise calibration',min:0.3,max:3}, {n:'riseCal2',l:'HV rise calibration',min:0.3,max:3},
-  NONNEG('pCore','Core price','₹/kg'), NONNEG('pCu','Copper price','₹/kg'), NONNEG('pAl','Aluminium price','₹/kg')];
+  NONNEG('pCore','Core price','₹/kg'), NONNEG('pCu','Copper price','₹/kg'), NONNEG('pAl','Aluminium price','₹/kg'),
+  POS('llTarget','Load loss target','W'), {n:'llTol',l:'Target tolerance',min:0,max:50,u:'%'}, NONNEG('leadLoss','Lead loss','W'), NONNEG('capA','No-load capitalisation','₹/kW'), NONNEG('capB','Load capitalisation','₹/kW'), {n:'ovPct',l:'Over-voltage for flux check',min:0,max:30,u:'%'}, {n:'bSat',l:'Flux limit at over-voltage',min:1.5,max:2.1,u:'T'}];
 function roundCross(val,bad,warns){
   const hv=val('hvV'), lv=val('lvV'); if(hv&&lv&&hv<=lv) bad('hvV','HV voltage ('+hv+' V) must be higher than LV voltage ('+lv+' V). For LV/LV units use the rectangular-core module.');
   const tp=val('tapPlus')||0, tm=val('tapMinus')||0, ts=val('tapStep'); if(ts&&(tp||tm)&&Math.abs((tp+tm)/ts-Math.round((tp+tm)/ts))>1e-6) warns.push('The tap range '+tp+' % / −'+tm+' % is not a whole number of '+ts+' % steps.');
   if(!ts&&(tp||tm)) warns.push('Tap range is set but the tap step is 0, so no taps are calculated.');
   const cd=val('coreDia'), win=val('window'); if(cd&&win&&(win/cd<1.5||win/cd>8)) warns.push('Window height / core diameter = '+(win/cd).toFixed(1)+' is unusual (typical 2.5–6).');
 }
+
+// ================= Background worker for automatic design (both modules) =================
+// Runs rectAuto / designAuto off the page so typing stays smooth; falls back to the page if workers are blocked.
+let AUTO_WORKER=null, AUTO_WORKER_OK=true, AUTO_REQ=0;
+function autoWorker(){ if(!AUTO_WORKER_OK) return null; if(AUTO_WORKER) return AUTO_WORKER;
+  try{ const src=document.getElementById('engines').textContent+'\nself.onmessage=e=>{ try{ const f=e.data.kind==="round"?designAuto:rectAuto; self.postMessage({id:e.data.id,o:f(e.data.p)}); }catch(err){ self.postMessage({id:e.data.id,err:String(err&&err.message||err)}); } };';
+    AUTO_WORKER=new Worker(URL.createObjectURL(new Blob([src],{type:'text/javascript'}))); AUTO_WORKER.onerror=()=>{ AUTO_WORKER_OK=false; AUTO_WORKER=null; }; return AUTO_WORKER; }catch(e){ AUTO_WORKER_OK=false; return null; } }
+function autoAsync(kind,p){ const run=()=>kind==='round'?designAuto(p):rectAuto(p);
+  return new Promise((resolve,reject)=>{ const w=autoWorker(); if(!w){ try{ resolve(run()); }catch(e){ reject(e); } return; }
+    const id=++AUTO_REQ; let done=false; const to=setTimeout(()=>{ if(done) return; done=true; AUTO_WORKER_OK=false; try{ resolve(run()); }catch(e){ reject(e); } },30000);
+    const h=e=>{ if(e.data.id!==id) return; w.removeEventListener('message',h); if(done) return; done=true; clearTimeout(to); e.data.err?reject(new Error(e.data.err)):resolve(e.data.o); };
+    w.addEventListener('message',h); try{ w.postMessage({id,kind,p}); }catch(e){ done=true; clearTimeout(to); w.removeEventListener('message',h); AUTO_WORKER_OK=false; try{ resolve(run()); }catch(e2){ reject(e2); } } }); }
+
+// ================= Shared outputs: GTP, alternatives, cutting list =================
+// g: normalised design summary built by each module (see rGtpData / roundGtpData)
+function gtpRows(g){ const f=(x,n)=>x==null||isNaN(x)?'—':Number(x).toFixed(n); const R=[]; let i=0; const add=(t,u,v)=>R.push([String(++i),t,u,v]);
+  add('Rating','kVA',String(g.kVA)); add('Phases / frequency','—','3 / '+g.freq+' Hz'); add('Type','—',g.type);
+  add('Rated voltage, '+g.w1.name,'V',g.w1.V+' ('+g.w1.conn+')'); add('Rated voltage, '+g.w2.name,'V',g.w2.V+' ('+g.w2.conn+')'); add('Rated current, '+g.w1.name+' / '+g.w2.name,'A',f(g.w1.I,2)+' / '+f(g.w2.I,2));
+  add('Vector group','—',g.vg); add('Cooling','—',g.cooling); add('Insulation class / temperature rise','—',g.insClass+' / '+f(g.riseLim,0)+' K');
+  add('Tapping','—',g.taps); add('Tap changer','—',g.tapChanger);
+  add('No-load loss','W',f(g.NLL,0)); add('Load loss at '+g.T+' °C, principal tap','W',f(g.LL,0)+(g.lead?' (incl. '+f(g.lead,0)+' W leads)':'')); add('Total loss at 100 % / 50 % load','W',f(g.NLL+g.LL,0)+' / '+f(g.NLL+0.25*g.LL,0));
+  add('Impedance at '+g.T+' °C','%',f(g.Z,2)); add('Resistance / reactance voltage','%',f(g.er,3)+' / '+f(g.ex,3)); add('No-load current','%',f(g.I0,2));
+  for(const pf of [1,0.8]) add('Efficiency at pf '+pf+': 100 / 75 / 50 % load','%',[1,0.75,0.5].map(x=>f(STD.effAt(g.kVA,g.NLL,g.LL,x,pf),2)).join(' / '));
+  add('Regulation at full load, pf 1 / pf 0.8','%',f(STD.reg(g.er,g.ex,1),2)+' / '+f(STD.reg(g.er,g.ex,0.8),2));
+  add('Temperature rise, '+g.w1.name+' / '+g.w2.name,'K',f(g.rise1,1)+' / '+f(g.rise2,1)); add('Maximum flux density at rated voltage','T',f(g.B,3));
+  add('Current density, '+g.w1.name+' / '+g.w2.name,'A/mm²',f(g.J1,2)+' / '+f(g.J2,2)); add('Core material','—',g.grade); add('Winding material','—',g.mat);
+  add('Mass of core / conductor / total','kg',f(g.mCore,0)+' / '+f(g.mCond,0)+' / '+f(g.mTot,0)); add('Overall dimensions L × B × H','mm',g.dims);
+  add('Insulation level (power-frequency / impulse)','kV',g.testV); add('Short-circuit withstand (IEC 60076-5)','—',g.sc); add('Noise level (estimate)','dB(A)',f(g.noise,0));
+  if(g.toc!=null) add('Total owning cost (price + capitalised losses)','₹',Math.round(g.toc).toLocaleString('en-IN'));
+  add('Standards','—',g.std); return R; }
+function gtpPdf(g,meta,file){ if(!window.jspdf){ toast('PDF library did not load.'); return; } const {jsPDF}=window.jspdf; const d=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'}); const ink=[23,33,43];
+  d.setDrawColor(...ink); d.setLineWidth(0.5); d.rect(10,10,190,22); d.setFont('helvetica','bold'); d.setFontSize(12); d.setTextColor(...ink); d.text('Guaranteed Technical Particulars',12,17);
+  d.setFont('helvetica','normal'); d.setFontSize(8); const cells=[['Party',meta.party||'—'],['Work order',meta.wo||'—'],['Revision',meta.rev||'R0'],['Date',new Date().toLocaleDateString('en-GB')],['Rating',g.kVA+' kVA, '+g.w2.V+' / '+g.w1.V+' V'],['Tool',APP_VERSION]];
+  cells.forEach((c,i)=>{ const x=12+(i%3)*63, y=23+Math.floor(i/3)*5; d.setTextColor(90); d.text(pdfText(c[0])+':',x,y); d.setTextColor(...ink); d.text(pdfText(c[1]).slice(0,34),x+17,y); });
+  d.autoTable({theme:'grid',startY:36,margin:{left:10,right:10,bottom:14},styles:{fontSize:7.6,cellPadding:1.1,lineColor:[150,160,170],lineWidth:0.15,textColor:ink},headStyles:{fillColor:[228,233,238],textColor:ink,fontStyle:'bold'},
+    head:[['#','Particular','Unit','Guaranteed / design value']],body:gtpRows(g).map(r=>r.map(pdfText)),columnStyles:{0:{cellWidth:8},1:{cellWidth:86,fontStyle:'bold'},2:{cellWidth:16}}});
+  const y=Math.min(d.lastAutoTable.finalY+14,275); d.setFontSize(8); d.setTextColor(90);
+  ['Designed','Checked','Approved'].forEach((t,i)=>{ const x=12+i*63; d.line(x,y,x+55,y); d.text(t+(i===0&&meta.by?': '+pdfText(meta.by):i===1&&meta.chk?': '+pdfText(meta.chk):i===2&&meta.appr?': '+pdfText(meta.appr):''),x,y+4); });
+  d.setFontSize(6); d.text(pdfText('Values are design (calculated) values; test tolerances per IEC 60076-1 / IS 2026 apply. Generated '+new Date().toLocaleString('en-GB')),10,290);
+  saveFile(file,d.output('blob')); }
+function cutRows(cut){ return cut.rows.map(r=>[r.grp,String(r.step),String(r.w),(Math.round(r.stack*10)/10).toString(),String(r.qty),Math.round(r.short)+' / '+Math.round(r.long),(Math.round(r.kg*10)/10).toString()]); }
+// Alternatives table: rows with a "Use" button; cur = index of the design currently shown
+function renderAlts(sel,alts,cols,onUse){ const el=document.querySelector(sel); if(!alts||alts.length<2){ el.innerHTML=''; return; }
+  const e=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  el.innerHTML='<details><summary>Alternative designs ('+alts.length+') — compare and pick</summary><div class="tblwrap"><table><tr>'+cols.map(c=>'<th>'+e(c[0])+'</th>').join('')+'<th>Checks</th><th></th></tr>'+
+    alts.map((a,i)=>'<tr'+(i===0?' class="cur"':'')+'>'+cols.map(c=>'<td>'+e(c[1](a))+'</td>').join('')+'<td class="'+(a.fails?'bad':'')+'">'+(a.fails?a.fails+' fail':'all pass')+'</td><td>'+(i===0?'shown':'<button type="button" class="btn sm" data-alt="'+i+'">Use</button>')+'</td></tr>').join('')+
+    '</table></div><p class="hint">The first row is the design shown. Use copies that alternative into the design fields as a fixed design.</p></details>';
+  el.querySelectorAll('[data-alt]').forEach(b=>b.addEventListener('click',()=>onUse(alts[+b.dataset.alt]))); }

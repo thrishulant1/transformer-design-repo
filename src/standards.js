@@ -1,5 +1,5 @@
 // ===== Shared standards helpers (used by both engines) =====
-const APP_VERSION='1.2.1 (23 Sep 2026)';
+const APP_VERSION='1.3.0 (25 Sep 2026)';
 const STD={};
 // Resistivity at 20 °C (Ω·mm²/m) and temperature constant: Cu 100 % IACS, EC aluminium 61 % IACS
 STD.RHO={Cu:{r20:0.017241,k:234.5},Al:{r20:0.028264,k:225}};
@@ -48,3 +48,21 @@ STD.noise=(A,Bk,mass,B)=>A+10*Math.log10(Math.max(mass,1))+Bk*(B-1.4);
 STD.fLoss=(f)=>Math.pow(f/50,1.5); STD.fVA=(f)=>f/50;
 // Harmonic loading (IEEE C57.110 style): winding eddy loss × K, other stray × K^0.8 (approximate)
 STD.kEddy=(K)=>K||1; STD.kOther=(K)=>Math.pow(K||1,0.8);
+
+// Core lamination cutting list for a three-limb core with 45° mitred joints ("3-blade", as in the Sara core program).
+// steps: [{w, stack}] widest first; H = limb (window) height; CD = limb centre distance; stack = total thickness of the step.
+// Rules (checked against the Sara print preview, Ø196 / 760 / 364): centre limb tip = H + Wmax, edge = tip − w;
+// outer limbs (2) long = H + Wmax + w, short = long − 2w; yokes (2) long = 2·CD + w, short = long − 2w.
+STD.cutList=(steps,H,CD,sf,dens)=>{ const Wm=steps[0].w, rho=(dens||7.65)*1e-6, k=sf||0.97; const rows=[]; let total=0;
+  const add=(grp,qty,i,w,stack,short,long)=>{ const kg=w*stack*qty*(short+long)/2*rho*k; total+=kg; rows.push({grp,step:i+1,w,stack,qty,short,long,kg}); };
+  steps.forEach((s,i)=>add('Centre limb',1,i,s.w,s.stack,H+Wm-s.w,H+Wm));
+  steps.forEach((s,i)=>add('Outer limbs',2,i,s.w,s.stack,H+Wm-s.w,H+Wm+s.w));
+  steps.forEach((s,i)=>add('Yokes',2,i,s.w,s.stack,2*CD-s.w,2*CD+s.w));
+  return {rows,total,type:'3-blade, 45° mitred'}; };
+// Efficiency at load fraction x and power factor pf; regulation (%) from er, ex at pf (IEC 60076-1 Annex / standard formula)
+STD.effAt=(kVA,NLL,LL,x,pf)=>{ const P=kVA*1000*x*pf; return 100*P/(P+NLL+x*x*LL); };
+STD.reg=(er,ex,pf)=>{ const s=Math.sqrt(Math.max(0,1-pf*pf)); const a=er*pf+ex*s, b=ex*pf-er*s; return a+b*b/200; };
+// Total owning cost: purchase cost + capitalised no-load and load losses (rates in ₹ per kW)
+STD.toc=(cost,NLL,LL,capA,capB)=>cost+(capA||0)*NLL/1000+(capB||0)*LL/1000;
+// Over-excitation check: flux at the stated over-voltage must stay below the chosen limit
+STD.overflux=(B,ovPct,limit)=>{ const Bov=B*(1+(ovPct||0)/100); return {Bov,ok:Bov<=limit}; };

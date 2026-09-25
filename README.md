@@ -1,4 +1,4 @@
-# Dry-type transformer design calculator — v1.2.1
+# Dry-type transformer design calculator — v1.3.0
 
 A web app with two design modules:
 
@@ -28,7 +28,7 @@ src/                 ← edit these files
 lib/                 PDF and Excel libraries (jsPDF 2.5.1, jsPDF-AutoTable 3.8.2, SheetJS 0.18.5), built into index.html
 tools/build.py       joins src/ and lib/ into index.html
 index.html           the built app, works offline (do not edit by hand)
-tests/regression.js  45 checks against the reference designs
+tests/regression.js  55 checks against the reference designs
 supabase.sql         optional shared design library
 ```
 
@@ -83,6 +83,21 @@ File names: `{work order or party}_{RECT|ROUND}_{kVA}kVA_{HV}-{LV}V_{revision}_{
 | Excel | CAL1, Compliance, BOM, Steps, Values (numbers), Guarantees & tests, Inputs (reloadable) | Design sheet, Steps, Core steps, Taps, Checks, Values, Guarantees & tests, Inputs |
 
 ## What changed
+
+**v1.3.0**
+- **Core cutting list (lamination list):** for every step, the centre limb, outer limbs and yokes with width, stack, quantity, short / long cut length and mass. The rules reproduce the Sara core program (45° mitred, 3-blade): all 24 cut lengths in its Ø196 / 760 / 364 example match. Shown in the sheet, PDF and Excel. Gross mass is calculated from the trapezoid laminations; for the Sara example it is about 2 % above the old program's figure.
+- **Load-loss target:** optional target with a minus tolerance. Automatic design adjusts current density to land just below it (both modules).
+- **Total owning cost:** optional capitalisation rates in ₹/kW for no-load and load loss. Automatic design then picks the lowest price + capitalised losses.
+- **Alternative designs:** up to six designs from each automatic search, compared side by side. **Use** copies one into the fields.
+- **GTP (Guaranteed Technical Particulars):**
+  - a one-page PDF with the button next to Download Excel, plus a GTP sheet in the Excel;
+  - it includes efficiency at 100 / 75 / 50 % load at pf 1 and 0.8, and regulation.
+- **Checks and inputs:**
+  - over-voltage flux check (default +10 %, limit 1.9 T, both editable);
+  - lead loss (round core);
+  - tap-changer type (off-circuit / OLTC) on the sheet and GTP.
+- **Saved designs:** each design now records the tool version, with a warning when it is loaded in a newer version.
+- **Round-core automatic design:** now runs in the background, like the rectangular core.
 
 **v1.2.1**
 - **Input checks:** every field has limits. Impossible entries (0 kVA, negative clearances, a strip with only one dimension, more layers than turns, HV not above LV in the round core, a missing supplier conductivity) are outlined in red with a plain message; the results are dimmed and PDF/Excel downloads wait until they are fixed.
@@ -185,6 +200,17 @@ In VS Code press **Ctrl+Shift+F**, search for the text in the middle column, edi
 
 Each rule is one line: `POS('kVA','Rating','kVA',{req:true,max:5000})` means "required, above 0, at most 5000". Add `warn:v=>...` to show a warning without blocking.
 
+### v1.3 features
+| What | Search for | File |
+|---|---|---|
+| Cutting-list rules | `STD.cutList=` | `src/standards.js` |
+| Efficiency and regulation formulas | `STD.effAt=` | `src/standards.js` |
+| Total owning cost | `STD.toc=` | `src/standards.js` |
+| Over-voltage flux check | `STD.overflux=` | `src/standards.js` |
+| GTP rows and layout | `function gtpRows` / `function gtpPdf` | `src/validation.js` |
+| Alternatives table | `function renderAlts` | `src/validation.js` |
+| Background worker (both modules) | `function autoAsync` | `src/validation.js` |
+
 ### Shared
 | What | Search for | File |
 |---|---|---|
@@ -195,7 +221,7 @@ Each rule is one line: `POS('kVA','Rating','kVA',{req:true,max:5000})` means "re
 | Page title and intro | `<header class="top">` | `src/page.html` |
 
 ## Checking a change
-- **Automatic:** `python tools/build.py --check` and `node tests/regression.js` (45 checks). Both run in CI on every push.
+- **Automatic:** `python tools/build.py --check` and `node tests/regression.js` (55 checks). Both run in CI on every push.
 - **Manual:** **Your 70 kVA sheet** must show 2.91 %, 268 W, 1,384 W and 298 kg.
 - **Intentional rule change** (for example after calibration): update the expected value in `tests/regression.js` in the same commit, with the test report reference.
 

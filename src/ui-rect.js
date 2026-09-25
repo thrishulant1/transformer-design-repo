@@ -39,7 +39,7 @@ function rInputs(){
     tankWkVA:n('tankWkVA')??1.5,extraTurn:n('extraTurn')??1,roundLen:rStr('roundLen')==='1',coreFactor:n('coreFactor')??1.32,buildF:n('buildF')??1.5,clrL:n('clrL')??250,clrB:n('clrB')??260,enclosure:rStr('enclosure')==='1',
     price:{core:n('pCore')??270,coreSteel:n('pSteel')??200,cond:n('pCond')??440,leads:n('pCond')??440,fg:n('pFg')??500,connFg:n('pFg')??500,clh:n('pClh')??5950,resin:n('pResin')??650,crca:90,others:n('pOthers')??15},
     altitude:n('altitude')??1000,kFactor:n('kFactor')??1,faultMVA:n('faultMVA'),scTime:n('scTime')??2,scRequired:rStr('scRequired')==='1',
-    condBasis:rStr('condBasis')||'standard',sigmaCustom:n('sigmaCustom'),riseCal1:n('riseCal1')??1,riseCal2:n('riseCal2')??1,noiseA:n('noiseA')??22,noiseB:n('noiseB')??35,stressCu:n('stressCu')??80,stressAl:n('stressAl')??35,bonded:rStr('bonded')==='1',
+    condBasis:rStr('condBasis')||'standard',sigmaCustom:n('sigmaCustom'),riseCal1:n('riseCal1')??1,riseCal2:n('riseCal2')??1,noiseA:n('noiseA')??22,noiseB:n('noiseB')??35,stressCu:n('stressCu')??80,stressAl:n('stressAl')??35,bonded:rStr('bonded')==='1',llTarget:n('llTarget'),llTol:n('llTol')??5,capA:n('capA'),capB:n('capB'),ovPct:n('ovPct')??10,bSat:n('bSat')??1.9,
     lvCond:c1,hvCond:c2,lvCondFixed:c1&&n('lvLayers')?c1:null,hvCondFixed:c2&&n('hvLayers')?c2:null};
   if(p.condBasis==='custom'&&!p.sigmaCustom) p.condBasis='standard';
   const manual=p.K&&p.B&&p.W&&p.lvLayers&&p.hvLayers&&c1&&c2&&p.lvDucts!=null&&p.hvDucts!=null;
@@ -49,15 +49,8 @@ function rInputs(){
 let RCUR=null, rTimer;
 rform.addEventListener('input',()=>{ clearTimeout(rTimer); rTimer=setTimeout(rRun,450); });
 rform.addEventListener('change',e=>{ if(e.target.name==='mat'){ rform.pCond.value=e.target.value==='Cu'?900:440; } clearTimeout(rTimer); rTimer=setTimeout(rRun,60); });
-// Automatic design runs in a background worker so typing stays smooth; falls back to the page if workers are blocked.
-let rWorker=null, rWorkerOk=true, rReq=0;
-function rWorkerGet(){ if(!rWorkerOk) return null; if(rWorker) return rWorker;
-  try{ const src=document.getElementById('engines').textContent+'\nself.onmessage=e=>{ try{ self.postMessage({id:e.data.id,o:rectAuto(e.data.p)}); }catch(err){ self.postMessage({id:e.data.id,err:String(err&&err.message||err)}); } };';
-    rWorker=new Worker(URL.createObjectURL(new Blob([src],{type:'text/javascript'}))); rWorker.onerror=()=>{ rWorkerOk=false; rWorker=null; }; return rWorker; }catch(e){ rWorkerOk=false; return null; } }
-function rAutoAsync(p){ return new Promise((resolve,reject)=>{ const w=rWorkerGet(); if(!w){ try{ resolve(rectAuto(p)); }catch(e){ reject(e); } return; }
-  const id=++rReq; let done=false; const to=setTimeout(()=>{ if(done) return; done=true; rWorkerOk=false; try{ resolve(rectAuto(p)); }catch(e){ reject(e); } },25000);
-  const h=e=>{ if(e.data.id!==id) return; w.removeEventListener('message',h); if(done) return; done=true; clearTimeout(to); e.data.err?reject(new Error(e.data.err)):resolve(e.data.o); };
-  w.addEventListener('message',h); try{ w.postMessage({id,p}); }catch(e){ done=true; clearTimeout(to); w.removeEventListener('message',h); rWorkerOk=false; try{ resolve(rectAuto(p)); }catch(e2){ reject(e2); } } }); }
+// Automatic design runs in the shared background worker (see autoAsync in validation.js)
+function rAutoAsync(p){ return autoAsync('rect',p); }
 let rRunSeq=0;
 function rRun(){
   if(!showInputCheck('#rInputCheck','#rKpis, #rWarns, #rOk, #rtab-sheet, #rtab-comp, #rtab-tests, #rtab-steps',validateForm(rform,RECT_RULES,(v,b,w)=>rectCross(v,b,w,rform)))){ ++rRunSeq; $('#rAutoNote').textContent=''; return; }
@@ -69,7 +62,7 @@ function rRun(){
     if(!o){ $('#rWarns').classList.add('on'); $('#rWarns ul').innerHTML='<li>No winding arrangement fits these fixed values. Clear one of the design fields so it can be chosen automatically.</li>'; $('#rAutoNote').textContent=''; return; }
     const ms=Math.round(performance.now()-t0);
     $('#rAutoNote').textContent=manual?'All design values are fixed, so this is a direct calculation.'+(p.basis==='sheet'?' Basis: as per design sheet.':''):
-      'Blank design values were chosen automatically: '+(o.searched||0).toLocaleString('en-IN')+' designs checked in '+ms+' ms'+(o.autoB?', flux density included':'')+'. The cheapest design meeting the requirement is shown.'+(o.turnsAdjusted?' Turns were adjusted to meet the IEC ratio tolerance.':'');
+      'Blank design values were chosen automatically: '+(o.searched||0).toLocaleString('en-IN')+' designs checked in '+ms+' ms'+(o.autoB?', flux density included':'')+(p.capA||p.capB?'. The design with the lowest total owning cost that meets the requirement is shown.':'. The cheapest design meeting the requirement is shown.')+(o.turnsAdjusted?' Turns were adjusted to meet the IEC ratio tolerance.':'');
     $('#rFix').hidden=manual;
     const M=rModel(o,meta); RCUR={o,M,meta,p}; rRender(o,M); rAfterRun();
   }).catch(e=>{ console.error(e); $('#rWarns').classList.add('on'); $('#rWarns ul').innerHTML='<li>These inputs cannot be designed: '+esc(e.message)+'.</li>'; });
@@ -126,7 +119,7 @@ function rModel(o,m){
   const imp=[['h (mean wdg length)',g(o.h,2)+' mm'],['b (radial span)',g(o.bb,2)+' mm'],['k_r',g(o.kr,4)],['Ls',g(o.Ls,2)+' mm'],['δ′',g(o.dP,2)+' mm²'],
     ['Er',g(o.er,3)+' %'],['Ex',g(o.ex,3)+' %'],['Ek',g(o.ek,3)+' % (limits '+g(o.zLo,2)+'–'+g(o.zHi,2)+')']];
   const loss=[['Inner winding',g(o.LL1,1)+' W'],['Outer winding',g(o.LL2,1)+' W'],['Tank / stray (W/kVA × kVA)',g(o.tank,0)+' W'],['Total load loss',g(o.LL,1)+' W'],['Core loss',g(o.NLL,1)+' W'],
-    ['Total loss',g(o.LL+o.NLL,1)+' W'],['Efficiency 100 % / 50 %, pf 1',g(o.eff,2)+' / '+g(o.eff50,2)+' %'],['McLyman overall rise',g(o.mcly,1)+' K'],['Noise estimate',g(o.noise,1)+' dB(A)'],['Turns-ratio error (limit)',g(o.rerr,3)+' % ('+g(o.ratioLim,3)+' %)'],['Rise limit (altitude-derated)',g(o.riseLim,1)+' K']];
+    ['Total loss',g(o.LL+o.NLL,1)+' W'],['Efficiency 100 % / 50 %, pf 1',g(o.eff,2)+' / '+g(o.eff50,2)+' %'],['McLyman overall rise',g(o.mcly,1)+' K'],['Noise estimate',g(o.noise,1)+' dB(A)'],['Turns-ratio error (limit)',g(o.rerr,3)+' % ('+g(o.ratioLim,3)+' %)'],['Rise limit (altitude-derated)',g(o.riseLim,1)+' K'],...((p.capA||p.capB)?[['Total owning cost','₹ '+f0(o.toc)+' (price + '+f0(p.capA||0)+' ₹/kW × NLL + '+f0(p.capB||0)+' ₹/kW × LL)']]:[])];
   const mech=[['Active part L × B × H',o.aL+' × '+o.aB+' × '+o.aH+' mm'],['Overall L × B × H',o.oL+' × '+o.oB+' × '+o.oH+' mm'],['Core and winding mass',o.coreWdg+' kg'],['Total mass (without enclosure)',g(o.totMass-(o.bom.find(b=>b.k==='CRCA enclosure')||{q:0}).q,1)+' kg'],['Total mass',g(o.totMass,1)+' kg']];
   const bom=o.bom.map((b,i)=>[String(i+1),b.k,g(b.q,2),b.pr?String(b.pr):'—',b.amt?f0(b.amt):'—']);
   bom.push(['','Sub-total','','',f0(o.matCost)],['','Others @ '+p.price.others+' %','','',f0(o.others)],['','RM price','','',f0(o.cost)]);
@@ -228,7 +221,7 @@ function rRender(o,M){
   $('#rSheet').innerHTML='<div class="titleblock"><div class="big">'+esc(t.title)+'</div>'+t.cells.map(c=>'<div><span>'+c[0]+'</span>'+esc(c[1])+'</div>').join('')+'</div>'+
     '<div class="cols"><div><h3>Winding data</h3>'+tbl(M.wind.slice(1),['Parameter',M.wind[0][1],M.wind[0][2]])+'<h3>Core and coil build-up</h3>'+tbl(M.build)+'</div><div>'+
     '<h3>Core</h3>'+tbl(M.core)+'<h3>Impedance voltage</h3>'+tbl(M.imp)+'<h3>Losses and efficiency</h3>'+tbl(M.loss)+'<h3>Mechanical details</h3>'+tbl(M.mech)+
-    '<h3>Bill of materials</h3><table><tr><th>#</th><th>Item</th><th>kg</th><th>₹/kg</th><th>₹</th></tr>'+M.bom.map(r=>'<tr>'+r.map((c,i)=>'<td'+(i>=2?' class="n"':'')+'>'+esc(c)+'</td>').join('')+'</tr>').join('')+'</table></div></div>';
+    '<h3>Bill of materials</h3><table><tr><th>#</th><th>Item</th><th>kg</th><th>₹/kg</th><th>₹</th></tr>'+M.bom.map(r=>'<tr>'+r.map((c,i)=>'<td'+(i>=2?' class="n"':'')+'>'+esc(c)+'</td>').join('')+'</tr>').join('')+'</table>'+'<h3>Core cutting list ('+esc(o.cut.type)+')</h3><table><tr><th>Part</th><th>Step</th><th>Width</th><th>Stack</th><th>Qty</th><th>Short / long, mm</th><th>kg</th></tr>'+cutRows(o.cut).map(r=>'<tr>'+r.map((c,i)=>'<td'+(i>=1?' class="n"':'')+'>'+esc(c)+'</td>').join('')+'</tr>').join('')+'<tr><th colspan="6">Calculated gross mass</th><td class="n">'+g(o.cut.total,1)+'</td></tr></table></div></div>';
   $('#rComp').innerHTML='<h3>Compliance with '+esc(REQ_NAME)+'</h3><p class="hint">Calculated rows are checked automatically. Rows the tool cannot calculate stay "To confirm" until you tick them.</p><div class="tblwrap"><table><tr><th>#</th><th>Parameter</th><th>Specification</th><th>Offered / design value</th><th>Status</th></tr>'+
     M.comp.map(r=>'<tr><td>'+r[0]+'</td><td>'+esc(r[1])+'</td><td>'+esc(r[2])+'</td><td>'+esc(r[3])+'</td><td style="font-weight:600;white-space:nowrap;color:'+({Complies:'#2E7D4F',Confirmed:'#2E7D4F','To confirm':'#9A6B00'}[r[4]]||'#B23A2E')+'">'+(r[6]?'<label class="conf"><input type="checkbox" data-conf="'+esc(r[1])+'"'+(r[4]==='Confirmed'?' checked':'')+'> '+r[4]+'</label>':r[4])+'</td></tr>').join('')+'</table></div>'+
     '<h3>Design checks</h3><div class="tblwrap"><table><tr><th>Check</th><th>Requirement</th><th>Obtained</th><th>Result</th></tr>'+o.checks.map(c=>'<tr><td>'+esc(c.name)+'</td><td>'+esc(c.req)+'</td><td>'+esc(c.got)+'</td><td style="font-weight:600;color:'+(c.ok?'#2E7D4F':'#B23A2E')+'">'+(c.ok?'Pass':'Fail')+'</td></tr>').join('')+'</table></div>';
@@ -347,7 +340,8 @@ $('#rPdf').addEventListener('click',async()=>{
     d.autoTable({...B(fs),startY:15,margin:{left:8,right:150,bottom:9},head:[['Check','Requirement','Obtained','Result']],body:P(M.checks.map(c=>[c.name,c.req,c.got,c.ok?'Pass':'Fail'])),didParseCell:h=>col(h,3,okc)});
     d.autoTable({...B(fs),startY:d.lastAutoTable.finalY+3,margin:{left:8,right:150,bottom:9},head:[['Core and coil build-up','']],body:P(M.build)});
     d.setPage(p0);
-    d.autoTable({...B(fs),startY:15,margin:{left:152,right:8,bottom:9},head:[['#','Item','kg','Rs/kg','Rs']],body:P(M.bom),columnStyles:{2:{halign:'right'},3:{halign:'right'},4:{halign:'right'}}}); });
+    d.autoTable({...B(fs),startY:15,margin:{left:152,right:8,bottom:9},head:[['#','Item','kg','Rs/kg','Rs']],body:P(M.bom),columnStyles:{2:{halign:'right'},3:{halign:'right'},4:{halign:'right'}}});
+    d.autoTable({...B(fs),startY:d.lastAutoTable.finalY+3,margin:{left:152,right:8,bottom:9},head:[['Core cutting','Step','W','Stack','Qty','Short / long','kg']],body:P(cutRows(RCUR.o.cut))}); });
   // page 4+: guarantees and tests, then steps
   d.addPage(); pdfFit(d,(fs)=>{ title(d,'Guarantees and factory test results');
     d.autoTable({...B(fs),startY:15,margin:{left:8,right:8,bottom:9},head:[['Item','Calculated','Guaranteed','Limit at test (IEC 60076-1)','Measured (FAT)','Result']],body:P(M.gt.map(r=>[r.item,r.calc,r.noG?'-':String(r.g),r.max,r.meas==null?'':String(r.meas),r.result])),didParseCell:h=>col(h,5,okc)});
@@ -363,11 +357,14 @@ $('#rXlsx').addEventListener('click',()=>{
   XLSX.utils.book_append_sheet(wb,cols(XLSX.utils.aoa_to_sheet(a),[36,34,34]),'CAL1');
   XLSX.utils.book_append_sheet(wb,cols(XLSX.utils.aoa_to_sheet([['#','Parameter','Specification','Offered / design value','Status'],...M.comp.map(r=>r.slice(0,5)),[],['Check','Requirement','Obtained','Result'],...M.checks.map(c=>[c.name,c.req,c.got,c.ok?'Pass':'Fail'])]),[6,50,45,55,12]),'Compliance');
   XLSX.utils.book_append_sheet(wb,cols(XLSX.utils.aoa_to_sheet([['#','Item','kg','Rs/kg','Rs'],...M.bom]),[5,28,12,10,14]),'BOM');
+  XLSX.utils.book_append_sheet(wb,cols(XLSX.utils.aoa_to_sheet([['Part','Step','Width mm','Stack mm','Qty','Short mm','Long mm','kg'],...RCUR.o.cut.rows.map(x=>[x.grp,x.step,x.w,x.stack,x.qty,Math.round(x.short),Math.round(x.long),Math.round(x.kg*10)/10]),['Total','','','','','','',Math.round(RCUR.o.cut.total*10)/10]]),[14,6,10,10,6,10,10,10]),'Core cutting');
+  XLSX.utils.book_append_sheet(wb,cols(XLSX.utils.aoa_to_sheet([['#','Particular','Unit','Value'],...gtpRows(rGtpData(RCUR.o,RCUR.meta))]),[5,48,8,40]),'GTP');
+  if(RCUR.o.alts) XLSX.utils.book_append_sheet(wb,cols(XLSX.utils.aoa_to_sheet([['K','B','W','D','Layers','Z %','NLL W','LL W','Eff %','Rise K','Mass kg','Price','TOC','Failed checks'],...RCUR.o.alts.map(a=>[a.K,a.B,a.W,a.D,a.L1+'/'+a.L2,+a.ek.toFixed(3),Math.round(a.NLL),Math.round(a.LL),+a.eff.toFixed(2),+a.rise.toFixed(1),Math.round(a.mass),Math.round(a.cost),Math.round(a.toc),a.fails])]),[5,5,5,5,8,7,8,8,7,7,8,10,10,8]),'Alternatives');
   XLSX.utils.book_append_sheet(wb,cols(XLSX.utils.aoa_to_sheet([['#','Item','Working','Result'],...M.steps.map((s,i)=>[i+1,...s])]),[5,28,90,40]),'Steps');
   XLSX.utils.book_append_sheet(wb,cols(XLSX.utils.aoa_to_sheet([['Quantity','Value','Unit'],...M.values.map(r=>[r[0],typeof r[1]==='number'?Math.round(r[1]*1e6)/1e6:r[1],r[2]])]),[30,14,8]),'Values');
   XLSX.utils.book_append_sheet(wb,cols(XLSX.utils.aoa_to_sheet([['Item','Calculated','Guaranteed','Limit at test','Measured','Result'],...M.gt.map(r=>[r.item,isNaN(+r.calc)?r.calc:+r.calc,r.noG?'':r.g,r.max,r.meas??'',r.result])]),[34,12,12,36,12,8]),'Guarantees & tests');
   const snap=rSnapshot(); const labels={}; for(const el of rform.elements){ if(el.name){ const l=el.closest('label'); labels[el.name]=l?(l.querySelector('b')||l).textContent.replace('*','').trim():el.name; } }
-  XLSX.utils.book_append_sheet(wb,cols(XLSX.utils.aoa_to_sheet([['Field','Value','Description'],...Object.entries(snap.v).map(([k,v])=>[k,v,labels[k]||'']),[],['__req__',JSON.stringify(snap.req),'Requirement rows'],['__reqName__',snap.reqName,'Requirement name'],['__conf__',JSON.stringify(snap.conf||[]),'Confirmed requirement rows'],['__gt__',JSON.stringify(snap.gt||{}),'Guarantees and test results']]),[14,30,40]),'Inputs');
+  XLSX.utils.book_append_sheet(wb,cols(XLSX.utils.aoa_to_sheet([['Field','Value','Description'],...Object.entries(snap.v).map(([k,v])=>[k,v,labels[k]||'']),[],['__req__',JSON.stringify(snap.req),'Requirement rows'],['__reqName__',snap.reqName,'Requirement name'],['__conf__',JSON.stringify(snap.conf||[]),'Confirmed requirement rows'],['__gt__',JSON.stringify(snap.gt||{}),'Guarantees and test results'],['__ver__',snap.ver,'Tool version']]),[14,30,40]),'Inputs');
   const out=XLSX.write(wb,{bookType:'xlsx',type:'array'}); saveFile(rfname('xlsx'),new Blob([out]));
 });
 
@@ -375,8 +372,9 @@ $('#rXlsx').addEventListener('click',()=>{
 const SKEY='rectDesigns.v1', LKEY='rectLast.v1';
 const sGet=k=>{ try{ return JSON.parse(localStorage.getItem(k)||'null'); }catch(e){ return null; } };
 const sSet=(k,v)=>{ try{ localStorage.setItem(k,JSON.stringify(v)); return true; }catch(e){ return false; } };
-function rSnapshot(){ const v={}; for(const el of rform.elements){ if(el.name) v[el.name]=el.value; } return {v,req:REQ,reqName:REQ_NAME,conf:[...R_CONF],gt:R_GT,at:new Date().toISOString()}; }
+function rSnapshot(){ const v={}; for(const el of rform.elements){ if(el.name) v[el.name]=el.value; } return {v,req:REQ,reqName:REQ_NAME,conf:[...R_CONF],gt:R_GT,ver:APP_VERSION,at:new Date().toISOString()}; }
 function rApply(s){ if(!s||!s.v) return; for(const el of rform.elements){ if(el.name&&s.v[el.name]!==undefined) el.value=s.v[el.name]; }
+  if(s.ver!==APP_VERSION) setTimeout(()=>toast('This design was saved with '+(s.ver?'tool '+s.ver:'an older tool version')+'. It has been recalculated with '+APP_VERSION+', so results may differ slightly.'),1200);
   R_CONF=new Set(Array.isArray(s.conf)?s.conf:[]); R_GT=(s.gt&&typeof s.gt==='object')?{...gtDefaults(),...s.gt}:gtDefaults();
   if(Array.isArray(s.req)&&s.req.length){ REQ=s.req; REQ_NAME=s.reqName||REQ_NAME; $('#reqStatus').textContent='Requirement: '+REQ_NAME+'.'; } rRun(); }
 // ---- Design library: shared when a backend is available, otherwise this browser ----
@@ -416,12 +414,29 @@ $('#expBtn').addEventListener('click',()=>{ const all=LIB.all(); if(!Object.keys
   saveFile('rect-core-designs_'+new Date().toISOString().slice(0,10)+'.json',new Blob([JSON.stringify({type:'rect-core-designs',version:2,designs:all},null,1)],{type:'application/json'})); });
 $('#impFile').addEventListener('change',async e=>{ const f=e.target.files[0]; if(!f) return;
   if(/\.xlsx?$/i.test(f.name)){ try{ const wb=XLSX.read(await f.arrayBuffer()); const ws=wb.Sheets['Inputs']; if(!ws) throw new Error('this Excel file has no Inputs sheet (only files downloaded from this page have one)');
-      const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''}); const v={}; let req=null,reqName=null,conf=[],gt=null;
-      for(const r of rows.slice(1)){ if(!r[0]) continue; if(r[0]==='__req__'){ try{req=JSON.parse(r[1]);}catch(_){} } else if(r[0]==='__reqName__') reqName=r[1]; else if(r[0]==='__conf__'){ try{conf=JSON.parse(r[1]);}catch(_){} } else if(r[0]==='__gt__'){ try{gt=JSON.parse(r[1]);}catch(_){} } else v[r[0]]=String(r[1]); }
-      const name=f.name.replace(/\.[^.]+$/,''); const s={v,req,reqName,conf,gt,at:new Date().toISOString()}; await LIB.save(name,s); rList(name); rApply(s); toast('Loaded and saved "'+name+'"');
+      const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''}); const v={}; let req=null,reqName=null,conf=[],gt=null,ver=null;
+      for(const r of rows.slice(1)){ if(!r[0]) continue; if(r[0]==='__req__'){ try{req=JSON.parse(r[1]);}catch(_){} } else if(r[0]==='__reqName__') reqName=r[1]; else if(r[0]==='__conf__'){ try{conf=JSON.parse(r[1]);}catch(_){} } else if(r[0]==='__gt__'){ try{gt=JSON.parse(r[1]);}catch(_){} } else if(r[0]==='__ver__') ver=String(r[1]); else v[r[0]]=String(r[1]); }
+      const name=f.name.replace(/\.[^.]+$/,''); const s={v,req,reqName,conf,gt,ver,at:new Date().toISOString()}; await LIB.save(name,s); rList(name); rApply(s); toast('Loaded and saved "'+name+'"');
     }catch(err){ toast('Could not load: '+err.message); } e.target.value=''; return; }
   try{ const j=JSON.parse(await f.text()); const inc=j.designs||j; let n=0; for(const [k,v] of Object.entries(inc)){ if(v&&v.v){ await LIB.save(k,v); n++; } } if(!n) throw new Error('no designs in file'); rList(); toast('Imported '+n+' design'+(n>1?'s':'')); }catch(err){ toast('Could not import: '+err.message); } e.target.value=''; });
 rSaveLast=function(){ sSet(LKEY,rSnapshot()); };
 const _rAfter=rAfterRun; rAfterRun=function(){ _rAfter(); rSaveLast(); };
 rList(); LIB.init().then(()=>rList());
 { const last=sGet(LKEY); if(last&&last.v&&last.v.kVA){ rApply(last); setTimeout(()=>{ $('#rAutoNote').textContent='Restored the inputs from your last visit. '+$('#rAutoNote').textContent; },900); } else rLoad(RPRESETS.sheet70); }
+
+// ---- GTP, alternatives (rectangular core) ----
+function rGtpData(o,m){ const p=o.p, cn=c=>c==='D'?'delta':'star';
+  return {kVA:p.kVA,freq:p.freq,type:'Dry type, rectangular core, class '+p.insClass,w1:{name:o.W1.role,V:o.W1.V,conn:cn(o.W1.conn),I:o.W1.conn==='Y'?o.W1.Iph:o.W1.Iph*Math.sqrt(3)},w2:{name:o.W2.role,V:o.W2.V,conn:cn(o.W2.conn),I:o.W2.conn==='Y'?o.W2.Iph:o.W2.Iph*Math.sqrt(3)},
+    vg:p.vg,cooling:'AN (natural air)',insClass:p.insClass,riseLim:o.riseLim,taps:'No taps',tapChanger:'—',NLL:o.NLL,LL:o.LL,lead:0,T:p.windTemp,Z:o.ek,er:o.er,ex:o.ex,I0:o.I0,
+    rise1:o.rise1,rise2:o.rise2,B:o.Bact,J1:o.J1,J2:o.J2,grade:'CRGO '+p.grade,mat:RC.COND[p.mat].name.toLowerCase(),mCore:o.coreMass,mCond:o.ins1+o.ins2,mTot:o.totMass,
+    dims:o.aL+' × '+o.aB+' × '+o.aH+' (active part)',testV:Math.max(p.priV,p.secV)<=1100?'3 kV / —':'per IS 11171',sc:o.sc.windings.every(w=>w.thermalOk)&&o.sc.windings[1].stressOk?'Complies':'By agreement (see checks)',noise:o.noise,
+    toc:(p.capA||p.capB)?o.toc:null,std:'IS 2026 / IEC 60076-11 (applied by agreement for LV/LV)'}; }
+$('#rGtp').addEventListener('click',()=>{ if(!RCUR) return; if($('#rInputCheck').classList.contains('err')){ toast('Fix the highlighted inputs first.'); return; }
+  gtpPdf(rGtpData(RCUR.o,RCUR.meta),RCUR.meta,rfname('pdf').replace(/\.pdf$/,'_GTP.pdf')); });
+function rShowAlts(o){ const cols=[['Core W × D',a=>a.W+' × '+a.D],['K / B',a=>a.K+' / '+a.B],['Layers',a=>a.L1+' / '+a.L2],['Z %',a=>a.ek.toFixed(2)],['NLL W',a=>Math.round(a.NLL)],['LL W',a=>Math.round(a.LL)],['Eff %',a=>a.eff.toFixed(2)],['Rise K',a=>Math.round(a.rise)],['Price ₹',a=>Math.round(a.cost).toLocaleString('en-IN')]];
+  if(o.p.capA||o.p.capB) cols.push(['TOC ₹',a=>Math.round(a.toc).toLocaleString('en-IN')]);
+  renderAlts('#rAlts',o.alts,cols,a=>{ const set=(k,v)=>{ if(rform.elements[k]) rform.elements[k].value=v; };
+    set('K',a.K); set('B',a.B); set('W',a.W); set('D',a.D); set('N1',a.N1); set('N2',a.N2); set('lvLayers',a.L1); set('hvLayers',a.L2); set('lvDucts',a.lvDucts); set('hvDucts',a.hvDucts);
+    for(const [pre,C] of [['lv',a.C1],['hv',a.C2]]){ set(pre+'Type',C.type); set(pre+'B',C.b); set(pre+'H',C.type==='round'?'':C.h); set(pre+'Rad',C.rad); set(pre+'Ax',C.ax); }
+    toast('Alternative copied into the design fields.'); rRun(); }); }
+const _rRenderPrev=rRender; rRender=function(o,M){ _rRenderPrev(o,M); rShowAlts(o); };
