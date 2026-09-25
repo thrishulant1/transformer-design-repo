@@ -131,6 +131,10 @@ label b{white-space:normal}
 .alts summary{font-family:var(--fh);font-weight:600;font-size:17px;cursor:pointer}
 .alts table{border-collapse:collapse;width:100%;font-size:13px;margin-top:6px}.alts th,.alts td{border-bottom:1px solid var(--rule2);padding:4px 6px;text-align:right;white-space:nowrap}
 .alts th:first-child,.alts td:first-child{text-align:left}.alts tr.cur td{font-weight:600}.alts .bad{color:var(--bad)}
+.more{position:relative;display:inline-block}.more>summary{list-style:none;display:inline-block}.more>summary::-webkit-details-marker{display:none}
+.more .menu{position:absolute;right:0;top:calc(100% + 4px);z-index:5;background:var(--panel);border:1px solid var(--rule);box-shadow:0 4px 14px rgba(0,0,0,.12);min-width:250px;padding:4px}
+.more .menu button{display:block;width:100%;text-align:left;border:0;background:transparent;color:var(--ink);padding:8px 10px;font-size:14px}.more .menu button:hover{background:var(--rule2)}
+table.cmp{border-collapse:collapse;width:100%;font-size:12.5px;margin-top:6px}table.cmp th,table.cmp td{border-bottom:1px solid var(--rule2);padding:3px 5px;text-align:right}table.cmp th:first-child,table.cmp td:first-child{text-align:left}table.cmp tr.diff td{background:rgba(192,138,30,.14)}
 </style>
 </head>
 <body>
@@ -152,7 +156,16 @@ label b{white-space:normal}
     <button class="btn sm" data-preset="p600">600 kVA Al</button>
     <button class="btn sm" data-preset="p1600">1600 kVA Cu</button>
     <button class="btn sm" data-preset="blank">Defaults</button>
+    <label class="btn sm filebtn wide">Import requirement sheet (.xlsx)<input type="file" id="oReqFile" accept=".xlsx,.xls,.csv" hidden></label>
   </div>
+  <div class="saved" aria-label="Saved round-core designs">
+    <p class="subhead">Saved designs <span class="libmode" id="oLibMode">This browser only</span></p>
+    <div class="saverow"><input id="oSaveName" placeholder="Name, e.g. 500 kVA 11 kV Cu" aria-label="Design name"><button type="button" class="btn sm primary" id="oSaveBtn">Save</button></div>
+    <div class="saverow three"><select id="oSavedList" aria-label="Saved designs"><option value="">No saved designs yet</option></select><button type="button" class="btn sm" id="oLoadBtn">Load</button><button type="button" class="btn sm" id="oDelBtn">Delete</button></div>
+    <div class="saverow one"><button type="button" class="btn sm" id="oCmpBtn">Compare two saved designs</button></div>
+    <div id="oCmp" hidden></div>
+  </div>
+  <p class="hint" id="oReqStatus">No requirement sheet imported. Import one to get the compliance tab.</p>
 <form id="f" autocomplete="off" onsubmit="return false">
   <details class="sec" open>
     <summary>Rating <small><span class="req">*</span> required</small></summary>
@@ -164,6 +177,7 @@ label b{white-space:normal}
       <label><b>Vector group <span class="req">*</span></b><select name="vg">
         <option>Dyn11</option><option>Dyn1</option><option>Dyn5</option><option>Ynd11</option><option>Ynd1</option><option>Yyn0</option><option>Dd0</option></select></label>
       <label><b>Insulation class <span class="req">*</span></b><select name="insClass"><option>B</option><option selected>F</option><option>H</option></select></label>
+      <div class="full saverow one"><button type="button" class="btn sm" data-typical="round">Fill typical values for this rating</button></div>
       <label><b>LV conductor <span class="req">*</span></b><select name="lvMat"><option value="Cu">Copper</option><option value="Al">Aluminium</option></select></label>
       <label><b>HV conductor <span class="req">*</span></b><select name="hvMat"><option value="Cu">Copper</option><option value="Al">Aluminium</option></select></label>
     </div>
@@ -208,11 +222,19 @@ label b{white-space:normal}
   </details>
 
   <button type="button" class="btn sm" id="fixRound" hidden style="margin-bottom:10px">Copy the automatic values into the Advanced fields</button>
+  <details class="sec">
+    <summary>Rating range <small>design many ratings at once</small></summary>
+    <label><b>Ratings, kVA</b><input id="oBatchList" value="100, 160, 250, 400, 630, 1000"></label>
+    <div class="saverow one"><button type="button" class="btn sm primary" data-batch="round" data-input="oBatchList" data-out="#oBatch">Design all ratings</button></div>
+    <p class="hint">Uses the current voltages, material, class and prices; each rating is designed automatically.</p>
+  </details>
   <details id="adv" class="sec">
     <summary>Advanced <small>blank = automatic sizing</small></summary>
     <div class="grid2">
       <label><b>Window height, mm</b><input name="window" type="number" placeholder="auto"></label>
       <label><b>Core diameter, mm</b><input name="coreDia" type="number" placeholder="auto"></label>
+      <label><b>Core steps</b><input name="coreSteps" type="number" placeholder="auto"></label>
+      <label><b>Step width multiple / minimum, mm</b><span class="pair"><input name="stepMult" type="number" placeholder="5" aria-label="step width multiple"><input name="minStep" type="number" placeholder="20" aria-label="minimum step width"></span></label>
       <label><b>LV end clearance, mm</b><input name="lvEnd" type="number" placeholder="auto"></label>
       <label><b>HV end clearance, mm</b><input name="hvEnd" type="number" placeholder="auto"></label>
       <label><b>LV turns / phase</b><input name="lvTurns" type="number" placeholder="auto"></label>
@@ -254,6 +276,8 @@ label b{white-space:normal}
       <label><b>Revision</b><input name="rev" placeholder="R0"></label>
       <label><b>Customer PO</b><input name="po"></label>
       <label><b>Drawing no.</b><input name="dwg"></label>
+      <label class="full"><b>Your company name (on all PDFs)</b><input data-company="name" placeholder="shown next to the logo"></label>
+      <div class="full saverow two"><label class="btn sm filebtn">Company logo (PNG/JPG)<input type="file" data-company="logo" accept="image/png,image/jpeg" hidden></label><button type="button" class="btn sm" data-company="clear">Remove logo <span data-company-status></span></button></div>
     </div>
   </details>
 </form>
@@ -263,25 +287,34 @@ label b{white-space:normal}
   <div class="bar">
     <div class="tabs" role="tablist">
       <button role="tab" aria-selected="true" data-tab="sheet">Design sheet</button>
+      <button role="tab" aria-selected="false" data-tab="comp">Compliance</button>
       <button role="tab" aria-selected="false" data-tab="checks">Checks and tests</button>
       <button role="tab" aria-selected="false" data-tab="steps">Step-by-step</button>
     </div>
     <div class="exports">
       <button class="btn primary" id="dlPdf">Download PDF</button>
       <button class="btn" id="dlXlsx">Download Excel</button>
-      <button class="btn" id="dlGtp">GTP (PDF)</button>
+      <details class="more"><summary class="btn">More downloads ▾</summary><div class="menu">
+        <button type="button" data-more="gtp" data-mod="round" id="dlGtp">GTP (PDF)</button>
+        <button type="button" data-more="plate" data-mod="round">Rating plate (PDF)</button>
+        <button type="button" data-more="cert" data-mod="round">Routine test certificate (PDF)</button>
+        <button type="button" data-more="dxf" data-mod="round">Drawings (DXF, for CAD)</button>
+        <button type="button" data-more="cad" data-mod="round">CAD parameters (Excel)</button>
+      </div></details>
     </div>
   </div>
   <p class="hint" id="roundNote" style="margin:-6px 0 10px"></p>
   <div class="inputcheck" id="inputCheck" role="alert"></div>
   <div class="kpis" id="kpis"></div>
   <div class="warns" id="warns"><strong>Check these before release</strong><ul></ul></div>
+  <div class="alts" id="oBatch"></div>
   <div class="alts" id="alts"></div>
   <p class="okline" id="okline">All checks pass: flux, current densities, gradients and impedance are within limits.</p>
   <section id="tab-sheet">
     <div class="drawing"><h2>General arrangement, to scale</h2><div id="svgwrap"></div></div>
     <div class="sheet" id="sheet"></div>
   </section>
+  <section id="tab-comp" hidden><div class="sheet" id="oComp"></div></section>
   <section id="tab-checks" hidden><div class="sheet" id="checks"></div></section>
   <section id="tab-steps" hidden>
     <div class="sheet steps" id="steps"></div>
@@ -310,7 +343,7 @@ const PRESETS={
   p1600:{...BASE,kVA:1600,k:0.428,B:1.596,Jlv:2.33,Jhv:2.14,tapPlus:5,tapMinus:5,tapStep:2.5,zTarget:6.25,refTemp:90,window:1217,lvEnd:60,hvEnd:140,lvDucts:1,lvDuctT:16,
     hvCoils:8,hvCond:'strip',lvhvGap:50,phaseGap:60,ref:'1600 kVA 11000/415 V Class F'}
 };
-const NUM=new Set(['kVA','freq','hvV','lvV','k','B','Jlv','Jhv','tapPlus','tapMinus','tapStep','zTarget','refTemp','window','coreDia','lvEnd','hvEnd','lvTurns','lvLayers','lvAx','lvRad','lvTransp','lvDucts','lvDuctT','coreLV','hvCoils','hvDucts','hvDuctT','lvhvGap','phaseGap','hvCoilGap','hvMinIns','lvIns','hvInsRound','hvInsStrip','enclClr','amb','altitude','faultMVA','scTime','maxLoss50','maxLoss100','noiseMax','riseCal1','riseCal2','pCore','pCu','pAl','llTarget','llTol','leadLoss','capA','capB','ovPct','bSat']);
+const NUM=new Set(['kVA','freq','hvV','lvV','k','B','Jlv','Jhv','tapPlus','tapMinus','tapStep','zTarget','refTemp','window','coreDia','lvEnd','hvEnd','lvTurns','lvLayers','lvAx','lvRad','lvTransp','lvDucts','lvDuctT','coreLV','hvCoils','hvDucts','hvDuctT','lvhvGap','phaseGap','hvCoilGap','hvMinIns','lvIns','hvInsRound','hvInsStrip','enclClr','amb','altitude','faultMVA','scTime','maxLoss50','maxLoss100','noiseMax','riseCal1','riseCal2','pCore','pCu','pAl','llTarget','llTol','leadLoss','capA','capB','ovPct','bSat','coreSteps','stepMult','minStep']);
 function loadPreset(key){ const p=PRESETS[key]; for(const el of form.elements){ if(!el.name) continue; const v=p[el.name]; el.value=(v===undefined||v===null)?'':v; } run(); }
 function readInputs(){
   const v={}; for(const el of form.elements){ if(!el.name) continue; const s=el.value.trim(); v[el.name]=NUM.has(el.name)?(s===''?null:parseFloat(s)):s; }
@@ -483,7 +516,7 @@ function run(){
   const {p,meta}=parsed; const seq=++ROUND_SEQ; const t0=performance.now(); $('#roundNote').textContent='Designing…';
   const job=(typeof autoAsync==='function')?autoAsync('round',p):Promise.resolve().then(()=>designAuto(p));
   job.then(o=>{ if(seq!==ROUND_SEQ) return; const M=buildModel(o,meta); CUR={o,M,meta}; renderKpis(o); renderSheet(M); renderSVG(o); renderChecks(o,M);
-    $('#fixRound').hidden=!(o.auto&&(o.auto.window||o.auto.layers||o.auto.lvDucts||o.auto.hvDucts)); roundShowAlts(o);
+    $('#fixRound').hidden=!(o.auto&&(o.auto.window||o.auto.layers||o.auto.lvDucts||o.auto.hvDucts)); roundShowAlts(o); if(typeof roundAfterRun==='function') roundAfterRun();
     $('#roundNote').textContent=(o.searched||0).toLocaleString('en-IN')+' designs checked in '+Math.round(performance.now()-t0)+' ms'+(p.llTarget?', aiming for '+p.llTarget+' W load loss':'')+'.'; })
   .catch(e=>{ if(seq!==ROUND_SEQ) return; console.error(e); $('#warns').classList.add('on'); $('#warns ul').innerHTML='<li>These inputs cannot be designed: '+esc(e.message)+'. Check the voltages and advanced fields.</li>'; });
 }
@@ -517,7 +550,7 @@ $('#fixRound').addEventListener('click',()=>{ if(!CUR) return; const o=CUR.o; co
   set('window',o.window); set('lvLayers',o.lv.layers); set('lvDucts',o.lv.ducts); set('hvDucts',o.hv.ducts); set('lvAx',o.lv.a); set('lvRad',o.lv.r); set('hvCoils',o.hv.coils); set('coreDia',o.core.D);
   $('#adv').open=true; toast('Automatic values copied into the Advanced fields.'); run(); });
 // tabs
-$$('#layout-round .tabs button').forEach(b=>b.addEventListener('click',()=>{ $$('#layout-round .tabs button').forEach(x=>x.setAttribute('aria-selected',x===b)); for(const t of ['sheet','checks','steps']) $('#tab-'+t).hidden=b.dataset.tab!==t; }));
+$$('#layout-round .tabs button').forEach(b=>b.addEventListener('click',()=>{ $$('#layout-round .tabs button').forEach(x=>x.setAttribute('aria-selected',x===b)); for(const t of ['sheet','comp','checks','steps']) $('#tab-'+t).hidden=b.dataset.tab!==t; }));
 $$('[data-preset]').forEach(b=>b.addEventListener('click',()=>loadPreset(b.dataset.preset)));
 function toast(t){ const el=$('#toast'); el.textContent=t; el.classList.add('on'); setTimeout(()=>el.classList.remove('on'),2600); }
 const dlP=(window.claude&&window.claude.use)?window.claude.use('downloads').catch(()=>null):Promise.resolve(null);
@@ -587,6 +620,7 @@ $('#dlXlsx').addEventListener('click',()=>{
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Check','Requirement','Obtained','Result'],...M.checks.map(c=>[c.name,c.req,c.got,c.ok?'Pass':'Fail'])]),'Checks');
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Quantity','Value','Unit'],...M.values.map(r=>[r[0],typeof r[1]==='number'?Math.round(r[1]*1e6)/1e6:r[1],r[2]])]),'Values');
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Item','Calculated','Guaranteed','Limit at test','Measured','Result'],...M.gt.map(r=>[r.item,isNaN(+r.calc)?r.calc:+r.calc,r.noG?'':r.g,r.max,r.meas??'',r.result])]),'Guarantees & tests');
+  if(CUR.comp) XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['#','Parameter','Specification','Offered / design value','Status'],...CUR.comp.map(r=>r.slice(0,5))]),'Compliance');
   const inp=[['Field','Value']]; for(const el of form.elements){ if(el.name) inp.push([el.name,el.value]); } XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(inp),'Inputs');
   const out=XLSX.write(wb,{bookType:'xlsx',type:'array'}); saveFile(fname('xlsx'),new Blob([out]));
 });

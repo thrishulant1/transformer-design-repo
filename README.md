@@ -1,4 +1,4 @@
-# Dry-type transformer design calculator — v1.3.0
+# Dry-type transformer design calculator — v1.4.0
 
 A web app with two design modules:
 
@@ -23,12 +23,14 @@ src/                 ← edit these files
   engine-rect.js       rectangular-core calculation
   guarantees.js        guarantees and FAT test comparison
   drawing.js           dimensioned drawings, drawing page in the PDF
-  validation.js        input checks (limits and messages for every field)
+  validation.js        input checks, background worker, GTP, alternatives table
+  extras.js            logo, More-downloads menu, rating plate, test certificate, DXF, CAD parameters, compare, rating range
+  ui-round-extra.js    round-core saved designs, requirement import, compliance; connects both modules to extras.js
   ui-rect.js           rectangular-core screens, library, exports
 lib/                 PDF and Excel libraries (jsPDF 2.5.1, jsPDF-AutoTable 3.8.2, SheetJS 0.18.5), built into index.html
 tools/build.py       joins src/ and lib/ into index.html
 index.html           the built app, works offline (do not edit by hand)
-tests/regression.js  55 checks against the reference designs
+tests/regression.js  57 checks against the reference designs
 supabase.sql         optional shared design library
 ```
 
@@ -83,6 +85,26 @@ File names: `{work order or party}_{RECT|ROUND}_{kVA}kVA_{HV}-{LV}V_{revision}_{
 | Excel | CAL1, Compliance, BOM, Steps, Values (numbers), Guarantees & tests, Inputs (reloadable) | Design sheet, Steps, Core steps, Taps, Checks, Values, Guarantees & tests, Inputs |
 
 ## What changed
+
+**v1.4.0**
+- **Round core, same as rectangular:**
+  - saved designs, stored in the same library with the prefix `round:`;
+  - requirement-sheet import and a Compliance tab with "To confirm" ticks;
+  - last inputs remembered after a refresh;
+  - a Compliance sheet in the Excel.
+- **Compare two saved designs:** key results side by side; rows differing by 1 % or more are highlighted. Designs store their results when saved, so designs saved before v1.4 must be saved again once.
+- **Rating range:** enter a list of ratings and design all of them automatically with the current requirement. The results table downloads as Excel.
+- **More downloads** menu (both modules):
+  - **GTP** (PDF).
+  - **Rating plate** (PDF, A5): IEC 60076-11 clause 9 data with the tap table.
+  - **Routine test certificate** (PDF): the test list, plus measured values against guarantees from the Tests tab.
+  - **Drawings (DXF):** AutoCAD R12, millimetres, layers CORE / INNER / OUTER / DIM / TEXT. Opens in AutoCAD, SOLIDWORKS and FreeCAD.
+  - **CAD parameters** (Excel): every dimension with a fixed name, for a SOLIDWORKS design table.
+- **Fill typical values for this rating:**
+  - Round core: impedance = IEC 60076-5 minimum, taps ±5 % in 2.5 % steps above 100 kVA, k, flux and current densities by material.
+  - Rectangular core: flux and current densities.
+- **Core step settings (round core, Advanced):** step-width multiple, minimum step width and number of steps.
+- **Company name and logo:** set once in Sheet header and shown on the PDFs. Stored in the browser.
 
 **v1.3.0**
 - **Core cutting list (lamination list):** for every step, the centre limb, outer limbs and yokes with width, stack, quantity, short / long cut length and mass. The rules reproduce the Sara core program (45° mitred, 3-blade): all 24 cut lengths in its Ø196 / 760 / 364 example match. Shown in the sheet, PDF and Excel. Gross mass is calculated from the trapezoid laminations; for the Sara example it is about 2 % above the old program's figure.
@@ -211,6 +233,18 @@ Each rule is one line: `POS('kVA','Rating','kVA',{req:true,max:5000})` means "re
 | Alternatives table | `function renderAlts` | `src/validation.js` |
 | Background worker (both modules) | `function autoAsync` | `src/validation.js` |
 
+### v1.4 features
+| What | Search for | File |
+|---|---|---|
+| Rating plate layout | `function ratingPlatePdf` | `src/extras.js` |
+| Test certificate layout and test list | `function testCertPdf` | `src/extras.js` |
+| DXF writer (layers, text) | `function svgToDxf` | `src/extras.js` |
+| CAD parameter names | `cadParams:` | `src/ui-round-extra.js` |
+| Rating range | `async function runBatch` | `src/extras.js` |
+| Typical values by rating | `applyTypical:` | `src/ui-round-extra.js` |
+| Core step settings | `function stepCore` | `src/engine-round.js` |
+| Round-core compliance wording | `function roundCompRows` | `src/ui-round-extra.js` |
+
 ### Shared
 | What | Search for | File |
 |---|---|---|
@@ -221,7 +255,7 @@ Each rule is one line: `POS('kVA','Rating','kVA',{req:true,max:5000})` means "re
 | Page title and intro | `<header class="top">` | `src/page.html` |
 
 ## Checking a change
-- **Automatic:** `python tools/build.py --check` and `node tests/regression.js` (55 checks). Both run in CI on every push.
+- **Automatic:** `python tools/build.py --check` and `node tests/regression.js` (57 checks). Both run in CI on every push.
 - **Manual:** **Your 70 kVA sheet** must show 2.91 %, 268 W, 1,384 W and 298 kg.
 - **Intentional rule change** (for example after calibration): update the expected value in `tests/regression.js` in the same commit, with the test report reference.
 

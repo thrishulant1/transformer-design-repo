@@ -51,6 +51,9 @@ near('Regulation er 1, ex 5, pf 0.8',X.STD.reg(1,5,0.8),3.8578,0.0005);
 { const a=X.designAuto({...X.DEFAULTS,window:null,lvLayers:null,lvDucts:null,hvDucts:null,llTarget:3500});
   is('Round auto meets a 3500 W load-loss target (−5 %)',a.loss.LL<=3500&&a.loss.LL>=3325); is('Round auto returns alternatives',a.alts&&a.alts.length>=3); }
 is('70 kVA over-voltage flux check passes (1.54 T ≤ 1.9 T)',r.checks.find(c=>/over-voltage/.test(c.name)).ok);
+console.log('\nv1.4 features');
+{ const q=X.design({...X.DEFAULTS,stepMult:10,minStep:30,coreSteps:8}); is('Core steps: 10 mm multiple, 30 mm minimum, 8 steps',q.core.steps.length===8&&q.core.steps.every(s=>s.w%10===0&&s.w>=30)); }
+{ const d=X.design(X.DEFAULTS); is('Default core steps unchanged (Ø219, widest 215)',d.core.D===219&&d.core.steps[0].w===215); }
 console.log('\nStandards helpers');
 near('IEC ratio limit at Z = 2.91 %',X.STD.ratioLimit(2.91),0.291,1e-9); near('Altitude factor 2000 m',X.STD.altitudeFactor(2000),0.95,1e-9);
 near('Al σ @115 °C (61 % IACS)',X.STD.sigmaStd('Al',115),25.49,0.01); near('SC temp Al θ0=164.5 J=47.9 t=2',X.STD.scTemp('Al',164.5,47.9,2),251,1);

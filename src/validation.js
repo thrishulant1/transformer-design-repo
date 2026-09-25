@@ -78,7 +78,7 @@ const ROUND_RULES=[
   NONNEG('tapPlus','Tap plus','%',{max:25}), NONNEG('tapMinus','Tap minus','%',{max:25}), NONNEG('tapStep','Tap step','%',{max:10}), NONNEG('zTarget','Target impedance','%',{max:25}),
   {n:'amb',l:'Ambient',min:-40,max:60,u:'°C'}, NONNEG('altitude','Altitude','m',{max:5000}), POS('faultMVA','System fault level','MVA',{max:100000}), {n:'scTime',l:'Short-circuit duration',min:0.25,max:10,u:'s'},
   POS('maxLoss50','Max total loss at 50 %','W'), POS('maxLoss100','Max total loss at 100 %','W'), {n:'noiseMax',l:'Noise max',min:20,max:120,u:'dB'},
-  POS('window','Window height','mm',{max:5000}), POS('coreDia','Core diameter','mm',{max:1500}), NONNEG('lvEnd','LV end clearance','mm',{max:1000}), NONNEG('hvEnd','HV end clearance','mm',{max:1000}),
+  POS('window','Window height','mm',{max:5000}), POS('coreDia','Core diameter','mm',{max:1500}), WHOLE('coreSteps','Core steps',3,20), {n:'stepMult',l:'Step width multiple',min:1,max:20,int:true,u:'mm'}, {n:'minStep',l:'Minimum step width',min:10,max:200,u:'mm'}, NONNEG('lvEnd','LV end clearance','mm',{max:1000}), NONNEG('hvEnd','HV end clearance','mm',{max:1000}),
   WHOLE('lvTurns','LV turns',1,5000), WHOLE('lvLayers','LV layers',1,20), WHOLE('lvAx','LV axial parallels',1,40), WHOLE('lvRad','LV radial parallels',1,10), NONNEG('lvTransp','LV transposition','mm',{max:200}),
   WHOLE('lvDucts','LV air ducts',0,10), POS('lvDuctT','LV duct width','mm',{max:60}), NONNEG('coreLV','Core to LV','mm',{max:100}), WHOLE('hvCoils','HV coils',1,80), WHOLE('hvDucts','HV air ducts',0,10), POS('hvDuctT','HV duct width','mm',{max:60}),
   NONNEG('lvhvGap','LV–HV gap','mm',{max:300}), NONNEG('phaseGap','HV phase gap','mm',{max:500}), NONNEG('hvCoilGap','HV coil-to-coil gap','mm',{max:200}),

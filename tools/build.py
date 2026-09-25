@@ -28,7 +28,7 @@ def build():
     engines = '\n'.join(strip(read(f)) for f in ['standards.js', 'engine-round.js', 'engine-rect.js', 'guarantees.js'])
     u = u.replace('/*__ENGINE__*/', engines)
     i = u.index('<script>\nconst $=')
-    u = u[:i] + '<script>\n' + read('drawing.js') + '\n' + read('validation.js') + '\n</script>\n' + u[i:]
+    u = u[:i] + '<script>\n' + read('drawing.js') + '\n' + read('validation.js') + '\n' + read('extras.js') + '\n</script>\n' + u[i:]
     if not cdn:
         # Build the PDF and Excel libraries into the page so downloads work without internet
         for url, f in LIBS:
@@ -39,7 +39,7 @@ def build():
             u = u.replace(tag, '<script>/* ' + f + ' (built in for offline use) */\n' + code + '\n</script>')
     marker = "loadPreset('p500');\n</script>"
     assert marker in u, 'page.html marker missing'
-    u = u.replace(marker, marker + '\n<script>\n' + read('ui-rect.js') + '\n</script>')
+    u = u.replace(marker, marker + '\n<script>\n' + read('ui-rect.js') + '\n</script>\n<script>\n' + read('ui-round-extra.js') + '\n</script>')
     assert '/*__' not in u, 'unreplaced placeholder'
     return u
 out = build()

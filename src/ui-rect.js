@@ -372,7 +372,7 @@ $('#rXlsx').addEventListener('click',()=>{
 const SKEY='rectDesigns.v1', LKEY='rectLast.v1';
 const sGet=k=>{ try{ return JSON.parse(localStorage.getItem(k)||'null'); }catch(e){ return null; } };
 const sSet=(k,v)=>{ try{ localStorage.setItem(k,JSON.stringify(v)); return true; }catch(e){ return false; } };
-function rSnapshot(){ const v={}; for(const el of rform.elements){ if(el.name) v[el.name]=el.value; } return {v,req:REQ,reqName:REQ_NAME,conf:[...R_CONF],gt:R_GT,ver:APP_VERSION,at:new Date().toISOString()}; }
+function rSnapshot(){ const v={}; for(const el of rform.elements){ if(el.name) v[el.name]=el.value; } return {v,req:REQ,reqName:REQ_NAME,conf:[...R_CONF],gt:R_GT,ver:APP_VERSION,at:new Date().toISOString(),sum:RCUR&&RCUR.M?RCUR.M.values:null}; }
 function rApply(s){ if(!s||!s.v) return; for(const el of rform.elements){ if(el.name&&s.v[el.name]!==undefined) el.value=s.v[el.name]; }
   if(s.ver!==APP_VERSION) setTimeout(()=>toast('This design was saved with '+(s.ver?'tool '+s.ver:'an older tool version')+'. It has been recalculated with '+APP_VERSION+', so results may differ slightly.'),1200);
   R_CONF=new Set(Array.isArray(s.conf)?s.conf:[]); R_GT=(s.gt&&typeof s.gt==='object')?{...gtDefaults(),...s.gt}:gtDefaults();
@@ -401,7 +401,7 @@ const LIB={mode:'local',cache:{},db:null,
     if(!r.ok) throw new Error('Supabase '+r.status); return method==='GET'?r.json():null; },
   async sbList(){ const rows=await this.sb('GET','?select=name,data,updated_at&order=updated_at.desc'); const c={}; for(const x of rows) c[x.name]=x.data; this.cache=c; }
 };
-function rList(sel){ const all=LIB.all(); const names=Object.keys(all).sort((a,b)=>(all[b].at||'').localeCompare(all[a].at||''));
+function rList(sel){ const all=LIB.all(); const names=Object.keys(all).filter(k=>!k.startsWith('round:')).sort((a,b)=>(all[b].at||'').localeCompare(all[a].at||''));
   const L=$('#savedList'); L.innerHTML=names.length?names.map(n=>'<option value="'+esc(n)+'">'+esc(n)+' — '+esc((all[n].v.kVA||'?')+' kVA, '+new Date(all[n].at).toLocaleDateString('en-GB'))+'</option>').join(''):'<option value="">No saved designs yet</option>';
   if(sel&&all[sel]) L.value=sel; $('#libMode').textContent=LIB.label();
   const local=sGet(SKEY)||{}; const missing=Object.keys(local).filter(k=>!all[k]); const pb=$('#pushLocal'); pb.hidden=!(LIB.mode!=='local'&&missing.length); pb.textContent='Copy '+missing.length+' design'+(missing.length>1?'s':'')+' from this browser to the shared library'; }

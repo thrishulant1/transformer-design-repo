@@ -566,6 +566,10 @@ label b{white-space:normal}
 .alts summary{font-family:var(--fh);font-weight:600;font-size:17px;cursor:pointer}
 .alts table{border-collapse:collapse;width:100%;font-size:13px;margin-top:6px}.alts th,.alts td{border-bottom:1px solid var(--rule2);padding:4px 6px;text-align:right;white-space:nowrap}
 .alts th:first-child,.alts td:first-child{text-align:left}.alts tr.cur td{font-weight:600}.alts .bad{color:var(--bad)}
+.more{position:relative;display:inline-block}.more>summary{list-style:none;display:inline-block}.more>summary::-webkit-details-marker{display:none}
+.more .menu{position:absolute;right:0;top:calc(100% + 4px);z-index:5;background:var(--panel);border:1px solid var(--rule);box-shadow:0 4px 14px rgba(0,0,0,.12);min-width:250px;padding:4px}
+.more .menu button{display:block;width:100%;text-align:left;border:0;background:transparent;color:var(--ink);padding:8px 10px;font-size:14px}.more .menu button:hover{background:var(--rule2)}
+table.cmp{border-collapse:collapse;width:100%;font-size:12.5px;margin-top:6px}table.cmp th,table.cmp td{border-bottom:1px solid var(--rule2);padding:3px 5px;text-align:right}table.cmp th:first-child,table.cmp td:first-child{text-align:left}table.cmp tr.diff td{background:rgba(192,138,30,.14)}
 .grid4{display:grid;grid-template-columns:1.1fr 1fr 1fr 1.2fr;gap:8px}
 .pair{display:flex;gap:4px}.pair input,.pair select{min-width:0}
 .subhead{font-size:13px;font-weight:600;margin:10px 0 4px;color:var(--ink)}
@@ -595,7 +599,16 @@ label b{white-space:normal}
     <button class="btn sm" data-preset="p600">600 kVA Al</button>
     <button class="btn sm" data-preset="p1600">1600 kVA Cu</button>
     <button class="btn sm" data-preset="blank">Defaults</button>
+    <label class="btn sm filebtn wide">Import requirement sheet (.xlsx)<input type="file" id="oReqFile" accept=".xlsx,.xls,.csv" hidden></label>
   </div>
+  <div class="saved" aria-label="Saved round-core designs">
+    <p class="subhead">Saved designs <span class="libmode" id="oLibMode">This browser only</span></p>
+    <div class="saverow"><input id="oSaveName" placeholder="Name, e.g. 500 kVA 11 kV Cu" aria-label="Design name"><button type="button" class="btn sm primary" id="oSaveBtn">Save</button></div>
+    <div class="saverow three"><select id="oSavedList" aria-label="Saved designs"><option value="">No saved designs yet</option></select><button type="button" class="btn sm" id="oLoadBtn">Load</button><button type="button" class="btn sm" id="oDelBtn">Delete</button></div>
+    <div class="saverow one"><button type="button" class="btn sm" id="oCmpBtn">Compare two saved designs</button></div>
+    <div id="oCmp" hidden></div>
+  </div>
+  <p class="hint" id="oReqStatus">No requirement sheet imported. Import one to get the compliance tab.</p>
 <form id="f" autocomplete="off" onsubmit="return false">
   <details class="sec" open>
     <summary>Rating <small><span class="req">*</span> required</small></summary>
@@ -607,6 +620,7 @@ label b{white-space:normal}
       <label><b>Vector group <span class="req">*</span></b><select name="vg">
         <option>Dyn11</option><option>Dyn1</option><option>Dyn5</option><option>Ynd11</option><option>Ynd1</option><option>Yyn0</option><option>Dd0</option></select></label>
       <label><b>Insulation class <span class="req">*</span></b><select name="insClass"><option>B</option><option selected>F</option><option>H</option></select></label>
+      <div class="full saverow one"><button type="button" class="btn sm" data-typical="round">Fill typical values for this rating</button></div>
       <label><b>LV conductor <span class="req">*</span></b><select name="lvMat"><option value="Cu">Copper</option><option value="Al">Aluminium</option></select></label>
       <label><b>HV conductor <span class="req">*</span></b><select name="hvMat"><option value="Cu">Copper</option><option value="Al">Aluminium</option></select></label>
     </div>
@@ -651,11 +665,19 @@ label b{white-space:normal}
   </details>
 
   <button type="button" class="btn sm" id="fixRound" hidden style="margin-bottom:10px">Copy the automatic values into the Advanced fields</button>
+  <details class="sec">
+    <summary>Rating range <small>design many ratings at once</small></summary>
+    <label><b>Ratings, kVA</b><input id="oBatchList" value="100, 160, 250, 400, 630, 1000"></label>
+    <div class="saverow one"><button type="button" class="btn sm primary" data-batch="round" data-input="oBatchList" data-out="#oBatch">Design all ratings</button></div>
+    <p class="hint">Uses the current voltages, material, class and prices; each rating is designed automatically.</p>
+  </details>
   <details id="adv" class="sec">
     <summary>Advanced <small>blank = automatic sizing</small></summary>
     <div class="grid2">
       <label><b>Window height, mm</b><input name="window" type="number" placeholder="auto"></label>
       <label><b>Core diameter, mm</b><input name="coreDia" type="number" placeholder="auto"></label>
+      <label><b>Core steps</b><input name="coreSteps" type="number" placeholder="auto"></label>
+      <label><b>Step width multiple / minimum, mm</b><span class="pair"><input name="stepMult" type="number" placeholder="5" aria-label="step width multiple"><input name="minStep" type="number" placeholder="20" aria-label="minimum step width"></span></label>
       <label><b>LV end clearance, mm</b><input name="lvEnd" type="number" placeholder="auto"></label>
       <label><b>HV end clearance, mm</b><input name="hvEnd" type="number" placeholder="auto"></label>
       <label><b>LV turns / phase</b><input name="lvTurns" type="number" placeholder="auto"></label>
@@ -697,6 +719,8 @@ label b{white-space:normal}
       <label><b>Revision</b><input name="rev" placeholder="R0"></label>
       <label><b>Customer PO</b><input name="po"></label>
       <label><b>Drawing no.</b><input name="dwg"></label>
+      <label class="full"><b>Your company name (on all PDFs)</b><input data-company="name" placeholder="shown next to the logo"></label>
+      <div class="full saverow two"><label class="btn sm filebtn">Company logo (PNG/JPG)<input type="file" data-company="logo" accept="image/png,image/jpeg" hidden></label><button type="button" class="btn sm" data-company="clear">Remove logo <span data-company-status></span></button></div>
     </div>
   </details>
 </form>
@@ -706,25 +730,34 @@ label b{white-space:normal}
   <div class="bar">
     <div class="tabs" role="tablist">
       <button role="tab" aria-selected="true" data-tab="sheet">Design sheet</button>
+      <button role="tab" aria-selected="false" data-tab="comp">Compliance</button>
       <button role="tab" aria-selected="false" data-tab="checks">Checks and tests</button>
       <button role="tab" aria-selected="false" data-tab="steps">Step-by-step</button>
     </div>
     <div class="exports">
       <button class="btn primary" id="dlPdf">Download PDF</button>
       <button class="btn" id="dlXlsx">Download Excel</button>
-      <button class="btn" id="dlGtp">GTP (PDF)</button>
+      <details class="more"><summary class="btn">More downloads ▾</summary><div class="menu">
+        <button type="button" data-more="gtp" data-mod="round" id="dlGtp">GTP (PDF)</button>
+        <button type="button" data-more="plate" data-mod="round">Rating plate (PDF)</button>
+        <button type="button" data-more="cert" data-mod="round">Routine test certificate (PDF)</button>
+        <button type="button" data-more="dxf" data-mod="round">Drawings (DXF, for CAD)</button>
+        <button type="button" data-more="cad" data-mod="round">CAD parameters (Excel)</button>
+      </div></details>
     </div>
   </div>
   <p class="hint" id="roundNote" style="margin:-6px 0 10px"></p>
   <div class="inputcheck" id="inputCheck" role="alert"></div>
   <div class="kpis" id="kpis"></div>
   <div class="warns" id="warns"><strong>Check these before release</strong><ul></ul></div>
+  <div class="alts" id="oBatch"></div>
   <div class="alts" id="alts"></div>
   <p class="okline" id="okline">All checks pass: flux, current densities, gradients and impedance are within limits.</p>
   <section id="tab-sheet">
     <div class="drawing"><h2>General arrangement, to scale</h2><div id="svgwrap"></div></div>
     <div class="sheet" id="sheet"></div>
   </section>
+  <section id="tab-comp" hidden><div class="sheet" id="oComp"></div></section>
   <section id="tab-checks" hidden><div class="sheet" id="checks"></div></section>
   <section id="tab-steps" hidden>
     <div class="sheet steps" id="steps"></div>
@@ -743,6 +776,8 @@ label b{white-space:normal}
     <div class="saverow"><input id="saveName" placeholder="Name, e.g. 8 kVA round wire" aria-label="Design name"><button type="button" class="btn sm primary" id="saveBtn">Save</button></div>
     <div class="saverow three"><select id="savedList" aria-label="Saved designs"><option value="">No saved designs yet</option></select><button type="button" class="btn sm" id="loadBtn">Load</button><button type="button" class="btn sm" id="delBtn">Delete</button></div>
     <div class="saverow two"><button type="button" class="btn sm" id="expBtn">Export (.json)</button><label class="btn sm filebtn">Load file (.json / Excel)<input type="file" id="impFile" accept=".json,.xlsx" hidden></label></div>
+    <div class="saverow one"><button type="button" class="btn sm" id="rCmpBtn">Compare two saved designs</button></div>
+    <div id="rCmp" hidden></div>
     <div class="saverow one"><button type="button" class="btn sm" id="pushLocal" hidden>Copy this browser's designs to the shared library</button></div>
   </div>
   <p class="hint" id="reqStatus">Requirement: TRX 70 kVA, 433 V / 400 V, Al, Dyn11 (built in).</p>
@@ -809,8 +844,15 @@ label b{white-space:normal}
       <label><b>h</b><input name="hvH" type="number" step="0.05" placeholder="auto"></label>
       <label><b>Rad × Ax</b><span class="pair"><input name="hvRad" type="number" placeholder="–" aria-label="radial parallels"><input name="hvAx" type="number" placeholder="–" aria-label="axial parallels"></span></label>
     </div>
+    <div class="saverow one"><button type="button" class="btn sm" data-typical="rect">Fill typical values for this rating</button></div>
     <p class="hint" id="rAutoNote"></p>
     <button type="button" class="btn sm" id="rFix" hidden>Copy the automatic values into the fields</button>
+  </details>
+  <details class="sec">
+    <summary>Rating range <small>design many ratings at once</small></summary>
+    <label><b>Ratings, kVA</b><input id="rBatchList" placeholder="e.g. 25, 50, 70, 100, 150" value="25, 50, 70, 100, 150"></label>
+    <div class="saverow one"><button type="button" class="btn sm primary" data-batch="rect" data-input="rBatchList" data-out="#rBatch">Design all ratings</button></div>
+    <p class="hint">Uses the current requirement (voltages, material, limits, prices) and designs each rating automatically. Results appear above the design sheet with an Excel download.</p>
   </details>
   <details class="sec">
     <summary>Targets and costing <small>optional</small></summary>
@@ -877,6 +919,8 @@ label b{white-space:normal}
       <label><b>Revision</b><input name="rev" placeholder="R0"></label>
       <label><b>Customer PO</b><input name="po"></label>
       <label><b>Drawing no.</b><input name="dwg"></label>
+      <label class="full"><b>Your company name (on all PDFs)</b><input data-company="name" placeholder="shown next to the logo"></label>
+      <div class="full saverow two"><label class="btn sm filebtn">Company logo (PNG/JPG)<input type="file" data-company="logo" accept="image/png,image/jpeg" hidden></label><button type="button" class="btn sm" data-company="clear">Remove logo <span data-company-status></span></button></div>
     </div>
   </details>
 </form>
@@ -892,12 +936,19 @@ label b{white-space:normal}
     <div class="exports">
       <button class="btn primary" id="rPdf">Download PDF</button>
       <button class="btn" id="rXlsx">Download Excel</button>
-      <button class="btn" id="rGtp">GTP (PDF)</button>
+      <details class="more"><summary class="btn">More downloads ▾</summary><div class="menu">
+        <button type="button" data-more="gtp" data-mod="rect" id="rGtp">GTP (PDF)</button>
+        <button type="button" data-more="plate" data-mod="rect">Rating plate (PDF)</button>
+        <button type="button" data-more="cert" data-mod="rect">Routine test certificate (PDF)</button>
+        <button type="button" data-more="dxf" data-mod="rect">Drawings (DXF, for CAD)</button>
+        <button type="button" data-more="cad" data-mod="rect">CAD parameters (Excel)</button>
+      </div></details>
     </div>
   </div>
   <div class="inputcheck" id="rInputCheck" role="alert"></div>
   <div class="kpis" id="rKpis"></div>
   <div class="warns" id="rWarns"><strong>Does not meet the requirement yet</strong><ul></ul></div>
+  <div class="alts" id="rBatch"></div>
   <div class="alts" id="rAlts"></div>
   <p class="okline" id="rOk">Meets every checked requirement: impedance, efficiency, temperature rise, ratio error, flux and current density.</p>
   <section id="rtab-sheet">
@@ -914,7 +965,7 @@ label b{white-space:normal}
 
 <script id="engines">
 // ===== Shared standards helpers (used by both engines) =====
-const APP_VERSION='1.3.0 (25 Sep 2026)';
+const APP_VERSION='1.4.0 (25 Sep 2026)';
 const STD={};
 // Resistivity at 20 °C (Ω·mm²/m) and temperature constant: Cu 100 % IACS, EC aluminium 61 % IACS
 STD.RHO={Cu:{r20:0.017241,k:234.5},Al:{r20:0.028264,k:225}};
@@ -1008,15 +1059,16 @@ function hvClass(kVline){ if(kVline<=1.1) return {um:1.1,hvEnd:40,gap:10,phase:1
 
 // Stepped core: optimise step widths on a 5 mm grid, return steps & net area
 const _sc={};
-function stepCore(D,n,sf){ const key=D+'|'+n+'|'+sf; if(_sc[key]) return _sc[key]; return (_sc[key]=stepCore0(D,n,sf)); }
-function stepCore0(D,n,sf){
-  const R=D/2; let w=[]; for(let k=1;k<=n;k++){ const th=(k-0.5)/n*Math.PI/2*0.98; w.push(Math.max(20,Math.floor(2*R*Math.cos(th)/5)*5)); }
+// Stepped core. mult = step-width multiple (mm), minW = narrowest step (mm); defaults 5 and 20.
+function stepCore(D,n,sf,mult,minW){ mult=mult||5; minW=minW||20; const key=D+'|'+n+'|'+sf+'|'+mult+'|'+minW; if(_sc[key]) return _sc[key]; return (_sc[key]=stepCore0(D,n,sf,mult,minW)); }
+function stepCore0(D,n,sf,mult,minW){
+  const R=D/2; let w=[]; for(let k=1;k<=n;k++){ const th=(k-0.5)/n*Math.PI/2*0.98; w.push(Math.max(minW,Math.floor(2*R*Math.cos(th)/mult)*mult)); }
   w=[...new Set(w)].sort((a,b)=>b-a);
   const area=(ws)=>{ let prev=0,A=0; for(const x of ws){ if(x>D) return -1; const y=Math.sqrt(R*R-(x/2)**2); A+=x*2*(y-prev); prev=y;} return A; };
   let best=area(w), improved=true, it=0;
   while(improved&&it<200){ improved=false; it++;
-    for(let i=0;i<w.length;i++) for(const d of [-5,5]){ const t=w.slice(); t[i]+=d;
-      if(t[i]<20||t[i]>D-1) continue; if(i>0&&t[i]>=t[i-1]) continue; if(i<t.length-1&&t[i]<=t[i+1]) continue;
+    for(let i=0;i<w.length;i++) for(const d of [-mult,mult]){ const t=w.slice(); t[i]+=d;
+      if(t[i]<minW||t[i]>D-1) continue; if(i>0&&t[i]>=t[i-1]) continue; if(i<t.length-1&&t[i]<=t[i+1]) continue;
       const a=area(t); if(a>best+1e-9){best=a;w=t;improved=true;} } }
   let prev=0; const steps=w.map(x=>{ const y=Math.sqrt(R*R-(x/2)**2); const s=2*(y-prev); prev=y; return {w:x,stack:s,net:x*s*sf}; });
   return {steps,gross:best,net:best*sf,util:best/(Math.PI*R*R)};
@@ -1042,8 +1094,8 @@ function design(p){
   S(4,'Net core area required','A = V/T ÷ (4.44 × f × B × 10⁻⁶) = '+r1(vt,4)+' ÷ (4.44 × '+f+' × '+p.B+' × 10⁻⁶)', Math.round(Areq)+' mm²');
   let D=p.coreDia||Math.floor(Math.sqrt(4*Areq/(Math.PI*0.92))*0.97), core;
   const nSteps=(d)=>p.coreSteps||(d<120?6:d<180?8:d<250?10:d<350?12:14);
-  if(p.coreDia){ core=stepCore(D,nSteps(D),p.sf); }
-  else { for(let g=0;g<400;g++){ core=stepCore(D,nSteps(D),p.sf); if(core.net>=Areq) break; D++; } }
+  if(p.coreDia){ core=stepCore(D,nSteps(D),p.sf,p.stepMult,p.minStep); }
+  else { for(let g=0;g<400;g++){ core=stepCore(D,nSteps(D),p.sf,p.stepMult,p.minStep); if(core.net>=Areq) break; D++; } }
   const Anet=core.net, Bact=vt/(4.44*f*Anet*1e-6);
   S(5,'Gross core area / core factor','Gross = Net ÷ core factor = '+Math.round(Areq)+' ÷ '+r1(core.net/(Math.PI*D*D/4),3), Math.round(Areq/(core.net/(Math.PI*D*D/4)))+' mm²','Core factor = stacking × step utilisation');
   S(6,'Core diameter','D = √(Gross ÷ π/4), then stepped with '+core.steps.length+' steps', D+' mm','Net area obtained '+Math.round(Anet)+' mm² → B = '+r1(Bact,3)+' T');
@@ -1722,7 +1774,7 @@ const ROUND_RULES=[
   NONNEG('tapPlus','Tap plus','%',{max:25}), NONNEG('tapMinus','Tap minus','%',{max:25}), NONNEG('tapStep','Tap step','%',{max:10}), NONNEG('zTarget','Target impedance','%',{max:25}),
   {n:'amb',l:'Ambient',min:-40,max:60,u:'°C'}, NONNEG('altitude','Altitude','m',{max:5000}), POS('faultMVA','System fault level','MVA',{max:100000}), {n:'scTime',l:'Short-circuit duration',min:0.25,max:10,u:'s'},
   POS('maxLoss50','Max total loss at 50 %','W'), POS('maxLoss100','Max total loss at 100 %','W'), {n:'noiseMax',l:'Noise max',min:20,max:120,u:'dB'},
-  POS('window','Window height','mm',{max:5000}), POS('coreDia','Core diameter','mm',{max:1500}), NONNEG('lvEnd','LV end clearance','mm',{max:1000}), NONNEG('hvEnd','HV end clearance','mm',{max:1000}),
+  POS('window','Window height','mm',{max:5000}), POS('coreDia','Core diameter','mm',{max:1500}), WHOLE('coreSteps','Core steps',3,20), {n:'stepMult',l:'Step width multiple',min:1,max:20,int:true,u:'mm'}, {n:'minStep',l:'Minimum step width',min:10,max:200,u:'mm'}, NONNEG('lvEnd','LV end clearance','mm',{max:1000}), NONNEG('hvEnd','HV end clearance','mm',{max:1000}),
   WHOLE('lvTurns','LV turns',1,5000), WHOLE('lvLayers','LV layers',1,20), WHOLE('lvAx','LV axial parallels',1,40), WHOLE('lvRad','LV radial parallels',1,10), NONNEG('lvTransp','LV transposition','mm',{max:200}),
   WHOLE('lvDucts','LV air ducts',0,10), POS('lvDuctT','LV duct width','mm',{max:60}), NONNEG('coreLV','Core to LV','mm',{max:100}), WHOLE('hvCoils','HV coils',1,80), WHOLE('hvDucts','HV air ducts',0,10), POS('hvDuctT','HV duct width','mm',{max:60}),
   NONNEG('lvhvGap','LV–HV gap','mm',{max:300}), NONNEG('phaseGap','HV phase gap','mm',{max:500}), NONNEG('hvCoilGap','HV coil-to-coil gap','mm',{max:200}),
@@ -1785,6 +1837,143 @@ function renderAlts(sel,alts,cols,onUse){ const el=document.querySelector(sel); 
     '</table></div><p class="hint">The first row is the design shown. Use copies that alternative into the design fields as a fixed design.</p></details>';
   el.querySelectorAll('[data-alt]').forEach(b=>b.addEventListener('click',()=>onUse(alts[+b.dataset.alt]))); }
 
+// ================= Extras shared by both modules =================
+// Each module registers an adapter: EXTRAS.register('rect'|'round', {...}). See ui-rect.js and page.html.
+const EXTRAS={mods:{},register(k,a){ this.mods[k]=a; }};
+
+// ---------- Company name and logo (kept in this browser, used on every PDF) ----------
+const COMPANY_KEY='companySettings.v1';
+function companyGet(){ try{ return JSON.parse(localStorage.getItem(COMPANY_KEY)||'{}'); }catch(e){ return {}; } }
+function companySet(c){ try{ localStorage.setItem(COMPANY_KEY,JSON.stringify(c)); }catch(e){ toast('This browser blocked saving the company settings.'); } companyShow(); }
+function companyShow(){ const c=companyGet(); document.querySelectorAll('[data-company="name"]').forEach(el=>{ if(document.activeElement!==el) el.value=c.name||''; });
+  document.querySelectorAll('[data-company-status]').forEach(el=>el.textContent=c.logo?'Logo set':'No logo'); }
+function bindCompany(){ document.querySelectorAll('[data-company="name"]').forEach(el=>el.addEventListener('change',()=>companySet({...companyGet(),name:el.value.trim()})));
+  document.querySelectorAll('[data-company="logo"]').forEach(el=>el.addEventListener('change',()=>{ const f=el.files[0]; if(!f) return;
+    if(f.size>600000){ toast('Please use a logo under 600 kB (PNG or JPG).'); el.value=''; return; }
+    const rd=new FileReader(); rd.onload=()=>{ companySet({...companyGet(),logo:rd.result}); toast('Logo saved. It will appear on the PDFs.'); }; rd.readAsDataURL(f); el.value=''; }));
+  document.querySelectorAll('[data-company="clear"]').forEach(el=>el.addEventListener('click',()=>{ const c=companyGet(); delete c.logo; companySet(c); toast('Logo removed.'); }));
+  companyShow(); }
+// Draw the logo (fitted into w × h mm) and/or company name at (x, y) on a jsPDF page
+function pdfBrand(d,x,y,w,h){ const c=companyGet(); let used=0;
+  if(c.logo){ try{ const fmt=c.logo.startsWith('data:image/png')?'PNG':'JPEG'; const p=d.getImageProperties(c.logo); const k=Math.min(w/p.width,h/p.height); d.addImage(c.logo,fmt,x+w-p.width*k,y,p.width*k,p.height*k); used=1; }catch(e){} }
+  if(c.name){ d.setFont('helvetica','bold'); d.setFontSize(9); d.setTextColor(23,33,43); d.text(pdfText(c.name),x+w-(used?w+2:0),y+4,{align:'right'}); }
+}
+
+// ---------- "More downloads" menu ----------
+function moreAction(mod,act){ const A=EXTRAS.mods[mod]; if(!A||!A.ready()){ toast(A&&A.errMsg?A.errMsg():'Calculate a design first.'); return; }
+  if(act==='plate') ratingPlatePdf(A); else if(act==='cert') testCertPdf(A); else if(act==='dxf') dxfDownload(A); else if(act==='cad') cadParamsDownload(A); }
+function bindMore(){ document.querySelectorAll('[data-more]').forEach(b=>b.addEventListener('click',()=>{ const det=b.closest('details'); if(det) det.open=false; if(b.dataset.more!=='gtp') moreAction(b.dataset.mod,b.dataset.more); }));
+  document.addEventListener('click',e=>{ document.querySelectorAll('details.more[open]').forEach(d=>{ if(!d.contains(e.target)) d.open=false; }); }); }
+
+// ---------- Rating plate (IEC 60076-11 clause 9 data), A5 landscape ----------
+function ratingPlatePdf(A){ const {jsPDF}=window.jspdf; const d=new jsPDF({orientation:'landscape',unit:'mm',format:'a5'}); const g=A.gtpData(), x=A.plateExtra(), c=companyGet(); const ink=[23,33,43];
+  d.setDrawColor(...ink); d.setLineWidth(0.8); d.roundedRect(8,8,194,132,3,3); d.setLineWidth(0.3); d.roundedRect(11,11,188,126,2,2);
+  for(const [cx,cy] of [[16,16],[194,16],[16,132],[194,132]]) d.circle(cx,cy,1.6);
+  pdfBrand(d,120,14,74,12); d.setTextColor(...ink); d.setFont('helvetica','bold'); d.setFontSize(12); d.text(pdfText(x.title),22,20);
+  d.setFont('helvetica','normal'); d.setFontSize(7.5); d.text(pdfText(g.std),22,25);
+  const rows=[['Serial no.','','Year of manufacture',''],['Rated power',g.kVA+' kVA','Frequency / phases',g.freq+' Hz / 3'],
+    ['Rated voltage '+g.w2.name,g.w2.V+' V','Rated current '+g.w2.name,(Math.round(g.w2.I*100)/100)+' A'],['Rated voltage '+g.w1.name,g.w1.V+' V','Rated current '+g.w1.name,(Math.round(g.w1.I*100)/100)+' A'],
+    ['Vector group',g.vg,'Impedance at '+g.T+' °C',(Math.round(g.Z*100)/100)+' %'],['Cooling',g.cooling,'Insulation class',g.insClass],
+    ['Temperature rise',Math.round(g.riseLim)+' K','Insulation level',g.testV],['Total mass',Math.round(g.mTot)+' kg','E / C / F class',x.ecf||'—'],
+    ['Altitude',x.altitude,'Tapping',g.taps]];
+  d.autoTable({theme:'grid',startY:30,margin:{left:18,right:18},styles:{fontSize:8,cellPadding:1.3,lineColor:[120,130,140],lineWidth:0.2,textColor:ink},
+    columnStyles:{0:{fontStyle:'bold',cellWidth:38},2:{fontStyle:'bold',cellWidth:38}},body:rows.map(r=>r.map(pdfText))});
+  if(x.taps&&x.taps.length){ d.autoTable({theme:'grid',startY:d.lastAutoTable.finalY+2,margin:{left:18,right:18},styles:{fontSize:7,cellPadding:0.8,halign:'center',lineColor:[120,130,140],lineWidth:0.2,textColor:ink},headStyles:{fillColor:[235,238,241],textColor:ink},
+    head:[['Tap position',...x.taps.map(t=>t[0])]],body:[['HV voltage, V',...x.taps.map(t=>t[1])]]}); }
+  d.setFontSize(6); d.setTextColor(90); d.text(pdfText('Rating plate data per IEC 60076-11 clause 9 / IS 11171. Check against the customer specification before engraving. Tool '+APP_VERSION),18,134);
+  saveFile(A.fileName('pdf').replace(/\.pdf$/,'_RatingPlate.pdf'),d.output('blob')); }
+
+// ---------- Routine test certificate, A4 portrait ----------
+function testCertPdf(A){ const {jsPDF}=window.jspdf; const d=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'}); const g=A.gtpData(), m=A.meta(), S=A.gtSummary(), st=A.gtState(); const ink=[23,33,43];
+  const rows=gtRows(S,st).rows; const measured=rows.filter(r=>r.meas!=null&&r.meas!=='').length;
+  if(!measured) toast('No measured values yet. Enter FAT results in the Guarantees and tests tab; the certificate is made with blank results.');
+  pdfBrand(d,120,10,80,14); d.setTextColor(...ink); d.setFont('helvetica','bold'); d.setFontSize(14); d.text('Routine test certificate',10,17);
+  d.setFont('helvetica','normal'); d.setFontSize(8.5);
+  const info=[['Customer',m.party||''],['Work order',m.wo||''],['Serial no.',''],['Date of test',''],['Rating',g.kVA+' kVA, '+g.w2.V+' / '+g.w1.V+' V, '+g.vg],['Type',g.type],['Standard',g.std],['Design revision',(m.rev||'R0')+'  (tool '+APP_VERSION+')']];
+  d.autoTable({theme:'plain',startY:24,margin:{left:10,right:10},styles:{fontSize:8.5,cellPadding:0.9,textColor:ink},columnStyles:{0:{fontStyle:'bold',cellWidth:32}},body:info.map(r=>r.map(pdfText))});
+  const res=k=>{ const r=rows.find(x=>x.k===k); return r&&r.result?r.result:''; };
+  const tests=[['1','Insulation resistance before and after dielectric tests','> 100 MΩ @ 500 V DC',''],['2','Winding resistance ('+g.w1.name+' and '+g.w2.name+')','Deviation from design ≤ 5 %',res('R1')&&res('R2')?(res('R1')==='Pass'&&res('R2')==='Pass'?'Pass':'Fail'):''],
+    ['3','Voltage ratio and vector group check',g.vg+', ratio within IEC tolerance',res('ratio')],['4','No-load loss and current at rated voltage','Guarantee + tolerance',res('NLL')&&res('I0')?(res('NLL')==='Pass'&&res('I0')==='Pass'?'Pass':'Fail'):''],
+    ['5','Load loss and impedance at rated current',g.T+' °C, guarantee + tolerance',res('LL')&&res('Z')?(res('LL')==='Pass'&&res('Z')==='Pass'?'Pass':'Fail'):''],
+    ['6','Separate-source AC withstand (applied voltage)',g.testV.split('/')[0].trim()+', 60 s',''],['7','Induced AC withstand','2 × rated voltage, 120 × rated frequency / f s',''],
+    ...(A.pdRequired()?[['8','Partial discharge measurement','≤ 10 pC (IEC 60076-11)','']]:[])];
+  d.setFont('helvetica','bold'); d.setFontSize(10); d.text('Routine tests',10,d.lastAutoTable.finalY+7);
+  d.autoTable({theme:'grid',startY:d.lastAutoTable.finalY+9,margin:{left:10,right:10},styles:{fontSize:8,cellPadding:1.1,lineColor:[150,160,170],lineWidth:0.15,textColor:ink},headStyles:{fillColor:[228,233,238],textColor:ink},
+    head:[['#','Test','Requirement','Result']],body:tests.map(r=>r.map(pdfText)),columnStyles:{0:{cellWidth:8},3:{cellWidth:20,fontStyle:'bold'}},
+    didParseCell:h=>{ if(h.section==='body'&&h.column.index===3) h.cell.styles.textColor=h.cell.raw==='Pass'?[46,125,79]:(h.cell.raw==='Fail'?[178,58,46]:ink); }});
+  d.setFont('helvetica','bold'); d.setFontSize(10); d.text('Measured values against guarantees',10,d.lastAutoTable.finalY+7);
+  d.autoTable({theme:'grid',startY:d.lastAutoTable.finalY+9,margin:{left:10,right:10},styles:{fontSize:7.8,cellPadding:1,lineColor:[150,160,170],lineWidth:0.15,textColor:ink},headStyles:{fillColor:[228,233,238],textColor:ink},
+    head:[['Item','Guaranteed','Limit (IEC 60076-1)','Measured','Result']],body:rows.map(r=>[r.item,r.noG?'—':String(r.g),r.max,r.meas==null?'':String(r.meas),r.result]).map(r=>r.map(pdfText)),
+    didParseCell:h=>{ if(h.section==='body'&&h.column.index===4) h.cell.styles.textColor=h.cell.raw==='Pass'?[46,125,79]:[178,58,46]; }});
+  const y=Math.min(d.lastAutoTable.finalY+18,272); d.setFont('helvetica','normal'); d.setFontSize(8); d.setTextColor(90);
+  ['Tested by','Checked by','Witnessed by (customer)'].forEach((t,i)=>{ const x=12+i*63; d.line(x,y,x+55,y); d.text(t,x,y+4); });
+  d.setFontSize(6); d.text(pdfText('Results 6 and 7 are recorded by the test engineer. Generated '+new Date().toLocaleString('en-GB')),10,290);
+  saveFile(A.fileName('pdf').replace(/\.pdf$/,'_TestCertificate.pdf'),d.output('blob')); }
+
+// ---------- DXF export (AutoCAD R12 text format, millimetres, layers CORE / INNER / OUTER / DIM / TEXT) ----------
+function svgToDxf(svg){ const doc=new DOMParser().parseFromString(svg,'image/svg+xml'); const root=doc.documentElement; const vb=root.getAttribute('viewBox').split(/\s+/).map(Number); const H=vb[3];
+  const out=[]; const e=(...a)=>{ for(const x of a) out.push(String(x)); }; const Y=y=>(H-y);
+  const layerOf=(el)=>{ const f=(el.getAttribute('fill')||'').toUpperCase(), s=(el.getAttribute('stroke')||'').toUpperCase();
+    if(f==='#D4A23A'||s==='#8A6412') return 'INNER'; if(f==='#B06038'||s==='#6E3417') return 'OUTER'; if(f==='#A9B3BD'||s==='#56616C') return 'CORE'; return 'DIM'; };
+  const line=(L,x1,y1,x2,y2)=>e(0,'LINE',8,L,10,x1.toFixed(3),20,Y(y1).toFixed(3),30,0,11,x2.toFixed(3),21,Y(y2).toFixed(3),31,0);
+  const arc=(L,cx,cy,r,a0,a1)=>e(0,'ARC',8,L,10,cx.toFixed(3),20,Y(cy).toFixed(3),30,0,40,r.toFixed(3),50,a0,51,a1);
+  for(const el of root.querySelectorAll('rect,line,circle,path,text')){ const t=el.tagName.toLowerCase(), L=layerOf(el), n=a=>parseFloat(el.getAttribute(a)||0);
+    if(t==='rect'){ const x=n('x'),y=n('y'),w=n('width'),h=n('height'); let r=Math.min(n('rx'),w/2,h/2); if(w<=0||h<=0) continue;
+      if(r>0.01){ line(L,x+r,y,x+w-r,y); line(L,x+w,y+r,x+w,y+h-r); line(L,x+w-r,y+h,x+r,y+h); line(L,x,y+h-r,x,y+r);
+        arc(L,x+w-r,y+r,r,0,90); arc(L,x+r,y+r,r,90,180); arc(L,x+r,y+h-r,r,180,270); arc(L,x+w-r,y+h-r,r,270,360); }
+      else { line(L,x,y,x+w,y); line(L,x+w,y,x+w,y+h); line(L,x+w,y+h,x,y+h); line(L,x,y+h,x,y); } }
+    else if(t==='line') line(L,n('x1'),n('y1'),n('x2'),n('y2'));
+    else if(t==='circle') e(0,'CIRCLE',8,L,10,n('cx').toFixed(3),20,Y(n('cy')).toFixed(3),30,0,40,n('r').toFixed(3));
+    else if(t==='path'){ const tok=(el.getAttribute('d')||'').match(/[MLZ]|-?\d*\.?\d+(?:e-?\d+)?/gi)||[]; let cur=null,start=null,cmd='M';
+      for(let i=0;i<tok.length;){ const k=tok[i]; if(/[MLZ]/i.test(k)){ cmd=k.toUpperCase(); i++; if(cmd==='Z'){ if(cur&&start) line(L,cur[0],cur[1],start[0],start[1]); cur=start; } continue; }
+        const p=[parseFloat(tok[i]),parseFloat(tok[i+1])]; i+=2; if(cmd==='M'){ cur=p; start=p; cmd='L'; } else { line(L,cur[0],cur[1],p[0],p[1]); cur=p; } } }
+    else if(t==='text'){ const x=n('x'),y=n('y'),fs=n('font-size')||10, anc=el.getAttribute('text-anchor')||'start'; const tr=el.getAttribute('transform')||''; const rot=/rotate\((-?[\d.]+)/.exec(tr); const ang=rot?-parseFloat(rot[1]):0;
+      const s=(el.textContent||'').replace(/[^\x20-\x7E]/g,c=>({'Ø':'%%c','×':'x','°':'%%d','²':'2','–':'-','—':'-'}[c]||'')); if(!s.trim()) continue; const hj=anc==='middle'?1:(anc==='end'?2:0);
+      e(0,'TEXT',8,'TEXT',10,x.toFixed(3),20,Y(y).toFixed(3),30,0,40,(fs*0.72).toFixed(3),1,s,50,ang); if(hj) e(72,hj,11,x.toFixed(3),21,Y(y).toFixed(3),31,0); } }
+  const layers=[['CORE',8],['INNER',2],['OUTER',30],['DIM',7],['TEXT',7]];
+  const head=['0','SECTION','2','HEADER','9','$ACADVER','1','AC1009','9','$INSUNITS','70','4','9','$EXTMIN','10','0','20','0','9','$EXTMAX','10',String(vb[2]),'20',String(H),'0','ENDSEC',
+    '0','SECTION','2','TABLES','0','TABLE','2','LAYER','70',String(layers.length),...layers.flatMap(([n,c])=>['0','LAYER','2',n,'70','0','62',String(c),'6','CONTINUOUS']),'0','ENDTAB','0','ENDSEC','0','SECTION','2','ENTITIES'];
+  return head.concat(out,['0','ENDSEC','0','EOF']).join('\r\n'); }
+function dxfDownload(A){ const dxf=svgToDxf(A.drawing(true)); saveFile(A.fileName('dxf'),new Blob([dxf],{type:'application/dxf'})); toast('DXF saved: layers CORE, INNER, OUTER, DIM and TEXT, in millimetres.'); }
+// Named dimensions for a CAD design table (SOLIDWORKS / FreeCAD)
+function cadParamsDownload(A){ const rows=A.cadParams(); const ws=XLSX.utils.aoa_to_sheet([['Name','Value','Unit','Description'],...rows]); ws['!cols']=[{wch:26},{wch:12},{wch:6},{wch:48}];
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Parameters'); saveFile(A.fileName('xlsx').replace(/\.xlsx$/,'_CAD.xlsx'),new Blob([XLSX.write(wb,{bookType:'xlsx',type:'array'})])); }
+
+// ---------- Compare two saved designs (uses the key results stored when each design was saved) ----------
+function compareRender(boxSel,names,getSnap){ const box=document.querySelector(boxSel); if(names.length<2){ box.innerHTML='<p class="hint">Save at least two designs to compare them.</p>'; return; }
+  const e=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  const opt=sel=>names.map(n=>'<option'+(n===sel?' selected':'')+'>'+e(n)+'</option>').join('');
+  box.innerHTML='<div class="saverow two"><select data-cmp="a" aria-label="First design">'+opt(names[0])+'</select><select data-cmp="b" aria-label="Second design">'+opt(names[1])+'</select></div><div class="cmpout"></div>';
+  const draw=()=>{ const a=getSnap(box.querySelector('[data-cmp="a"]').value), b=getSnap(box.querySelector('[data-cmp="b"]').value); const out=box.querySelector('.cmpout');
+    if(!a||!b||!a.sum||!b.sum){ out.innerHTML='<p class="hint">One of these was saved before comparison existed. Load it and save it again to compare.</p>'; return; }
+    const mb=new Map(b.sum.map(r=>[r[0],r])); const fmt=v=>typeof v==='number'?(Math.abs(v)>=100?Math.round(v).toLocaleString('en-IN'):(+v.toFixed(3)).toString()):String(v);
+    out.innerHTML='<div class="tblwrap"><table class="cmp"><tr><th>Quantity</th><th>A</th><th>B</th><th>B − A</th></tr>'+a.sum.map(r=>{ const q=mb.get(r[0]); if(!q) return ''; const dv=(typeof r[1]==='number'&&typeof q[1]==='number')?q[1]-r[1]:null;
+      const pct=dv!=null&&r[1]?dv/Math.abs(r[1])*100:null; const hi=pct!=null&&Math.abs(pct)>=1;
+      return '<tr'+(hi?' class="diff"':'')+'><td>'+e(r[0])+(r[2]?' ('+e(r[2])+')':'')+'</td><td>'+fmt(r[1])+'</td><td>'+fmt(q[1])+'</td><td>'+(dv==null?(String(r[1])===String(q[1])?'':'differs'):(dv===0?'':(dv>0?'+':'')+fmt(dv)+(pct!=null?' ('+(pct>0?'+':'')+pct.toFixed(1)+' %)':'')))+'</td></tr>'; }).join('')+
+      '</table></div><p class="hint">Highlighted rows differ by 1 % or more. Values are as saved; A saved '+new Date(a.at).toLocaleDateString('en-GB')+' ('+e(a.ver||'older tool')+'), B saved '+new Date(b.at).toLocaleDateString('en-GB')+' ('+e(b.ver||'older tool')+').</p>'; };
+  box.querySelectorAll('[data-cmp]').forEach(s=>s.addEventListener('change',draw)); draw(); }
+
+// ---------- Rating range: design a list of ratings with the current requirement ----------
+async function runBatch(A,listText,boxSel){ const box=document.querySelector(boxSel);
+  const list=[...new Set(String(listText).split(/[\s,;]+/).map(Number).filter(v=>v>0&&v<=100000))].sort((a,b)=>a-b);
+  if(!list.length){ toast('Enter ratings in kVA, for example 25, 63, 100, 160, 250.'); return; } if(list.length>20){ toast('Please enter at most 20 ratings at a time.'); return; }
+  const base=A.batchTemplate(); if(!base){ toast('Fix the highlighted inputs first.'); return; }
+  const rows=[]; const head=A.batchHead(); const e=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  const paint=(msg)=>{ box.innerHTML='<details open><summary>Rating range — '+e(msg)+'</summary><div class="tblwrap"><table><tr>'+head.map(h=>'<th>'+e(h)+'</th>').join('')+'</tr>'+rows.map(r=>'<tr>'+r.map((c,i)=>'<td class="'+(i===r.length-1&&/fail/.test(c)?'bad':'')+'">'+e(c)+'</td>').join('')+'</tr>').join('')+'</table></div>'+
+    (rows.length===list.length?'<div class="saverow one"><button type="button" class="btn sm primary" data-batchx>Download this table (Excel)</button></div><p class="hint">Each rating was designed automatically with the current requirement (voltages, material, limits, prices). Rating-specific values such as a load-loss target are not applied. Open a rating by entering its kVA in the form.</p>':'')+'</details>';
+    const bx=box.querySelector('[data-batchx]'); if(bx) bx.addEventListener('click',()=>{ const ws=XLSX.utils.aoa_to_sheet([head,...rows.map(r=>r.map(c=>{ const v=String(c).replace(/[,₹\s]/g,''); return /^-?\d+(\.\d+)?$/.test(v)?+v:c; }))]); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Rating range');
+      saveFile(A.fileName('xlsx').replace(/_\d+kVA_/,'_RANGE_'+list[0]+'-'+list[list.length-1]+'kVA_'),new Blob([XLSX.write(wb,{bookType:'xlsx',type:'array'})])); }); };
+  for(let i=0;i<list.length;i++){ paint('designing '+list[i]+' kVA ('+(i+1)+' of '+list.length+')…');
+    try{ const o=await autoAsync(A.kind,{...base,kVA:list[i]}); rows.push(o?A.batchRow(o):[String(list[i]),'no design found']); }catch(err){ rows.push([String(list[i]),'error: '+err.message]); } }
+  paint(list.length+' ratings designed'); }
+
+// ---------- Typical starting values for a rating ----------
+function typicalValues(A){ const n=A.applyTypical(); if(n) toast('Typical values filled in: '+n+'. Check them against the customer specification.'); }
+
+function bindExtras(){ bindCompany(); bindMore();
+  document.querySelectorAll('[data-batch]').forEach(b=>b.addEventListener('click',()=>{ const A=EXTRAS.mods[b.dataset.batch]; const inp=document.getElementById(b.dataset.input); runBatch(A,inp.value,b.dataset.out); }));
+  document.querySelectorAll('[data-typical]').forEach(b=>b.addEventListener('click',()=>typicalValues(EXTRAS.mods[b.dataset.typical]))); }
+
 </script>
 <script>
 const $=(s,el=document)=>el.querySelector(s), $$=(s,el=document)=>[...el.querySelectorAll(s)];
@@ -1802,7 +1991,7 @@ const PRESETS={
   p1600:{...BASE,kVA:1600,k:0.428,B:1.596,Jlv:2.33,Jhv:2.14,tapPlus:5,tapMinus:5,tapStep:2.5,zTarget:6.25,refTemp:90,window:1217,lvEnd:60,hvEnd:140,lvDucts:1,lvDuctT:16,
     hvCoils:8,hvCond:'strip',lvhvGap:50,phaseGap:60,ref:'1600 kVA 11000/415 V Class F'}
 };
-const NUM=new Set(['kVA','freq','hvV','lvV','k','B','Jlv','Jhv','tapPlus','tapMinus','tapStep','zTarget','refTemp','window','coreDia','lvEnd','hvEnd','lvTurns','lvLayers','lvAx','lvRad','lvTransp','lvDucts','lvDuctT','coreLV','hvCoils','hvDucts','hvDuctT','lvhvGap','phaseGap','hvCoilGap','hvMinIns','lvIns','hvInsRound','hvInsStrip','enclClr','amb','altitude','faultMVA','scTime','maxLoss50','maxLoss100','noiseMax','riseCal1','riseCal2','pCore','pCu','pAl','llTarget','llTol','leadLoss','capA','capB','ovPct','bSat']);
+const NUM=new Set(['kVA','freq','hvV','lvV','k','B','Jlv','Jhv','tapPlus','tapMinus','tapStep','zTarget','refTemp','window','coreDia','lvEnd','hvEnd','lvTurns','lvLayers','lvAx','lvRad','lvTransp','lvDucts','lvDuctT','coreLV','hvCoils','hvDucts','hvDuctT','lvhvGap','phaseGap','hvCoilGap','hvMinIns','lvIns','hvInsRound','hvInsStrip','enclClr','amb','altitude','faultMVA','scTime','maxLoss50','maxLoss100','noiseMax','riseCal1','riseCal2','pCore','pCu','pAl','llTarget','llTol','leadLoss','capA','capB','ovPct','bSat','coreSteps','stepMult','minStep']);
 function loadPreset(key){ const p=PRESETS[key]; for(const el of form.elements){ if(!el.name) continue; const v=p[el.name]; el.value=(v===undefined||v===null)?'':v; } run(); }
 function readInputs(){
   const v={}; for(const el of form.elements){ if(!el.name) continue; const s=el.value.trim(); v[el.name]=NUM.has(el.name)?(s===''?null:parseFloat(s)):s; }
@@ -1975,7 +2164,7 @@ function run(){
   const {p,meta}=parsed; const seq=++ROUND_SEQ; const t0=performance.now(); $('#roundNote').textContent='Designing…';
   const job=(typeof autoAsync==='function')?autoAsync('round',p):Promise.resolve().then(()=>designAuto(p));
   job.then(o=>{ if(seq!==ROUND_SEQ) return; const M=buildModel(o,meta); CUR={o,M,meta}; renderKpis(o); renderSheet(M); renderSVG(o); renderChecks(o,M);
-    $('#fixRound').hidden=!(o.auto&&(o.auto.window||o.auto.layers||o.auto.lvDucts||o.auto.hvDucts)); roundShowAlts(o);
+    $('#fixRound').hidden=!(o.auto&&(o.auto.window||o.auto.layers||o.auto.lvDucts||o.auto.hvDucts)); roundShowAlts(o); if(typeof roundAfterRun==='function') roundAfterRun();
     $('#roundNote').textContent=(o.searched||0).toLocaleString('en-IN')+' designs checked in '+Math.round(performance.now()-t0)+' ms'+(p.llTarget?', aiming for '+p.llTarget+' W load loss':'')+'.'; })
   .catch(e=>{ if(seq!==ROUND_SEQ) return; console.error(e); $('#warns').classList.add('on'); $('#warns ul').innerHTML='<li>These inputs cannot be designed: '+esc(e.message)+'. Check the voltages and advanced fields.</li>'; });
 }
@@ -2009,7 +2198,7 @@ $('#fixRound').addEventListener('click',()=>{ if(!CUR) return; const o=CUR.o; co
   set('window',o.window); set('lvLayers',o.lv.layers); set('lvDucts',o.lv.ducts); set('hvDucts',o.hv.ducts); set('lvAx',o.lv.a); set('lvRad',o.lv.r); set('hvCoils',o.hv.coils); set('coreDia',o.core.D);
   $('#adv').open=true; toast('Automatic values copied into the Advanced fields.'); run(); });
 // tabs
-$$('#layout-round .tabs button').forEach(b=>b.addEventListener('click',()=>{ $$('#layout-round .tabs button').forEach(x=>x.setAttribute('aria-selected',x===b)); for(const t of ['sheet','checks','steps']) $('#tab-'+t).hidden=b.dataset.tab!==t; }));
+$$('#layout-round .tabs button').forEach(b=>b.addEventListener('click',()=>{ $$('#layout-round .tabs button').forEach(x=>x.setAttribute('aria-selected',x===b)); for(const t of ['sheet','comp','checks','steps']) $('#tab-'+t).hidden=b.dataset.tab!==t; }));
 $$('[data-preset]').forEach(b=>b.addEventListener('click',()=>loadPreset(b.dataset.preset)));
 function toast(t){ const el=$('#toast'); el.textContent=t; el.classList.add('on'); setTimeout(()=>el.classList.remove('on'),2600); }
 const dlP=(window.claude&&window.claude.use)?window.claude.use('downloads').catch(()=>null):Promise.resolve(null);
@@ -2079,6 +2268,7 @@ $('#dlXlsx').addEventListener('click',()=>{
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Check','Requirement','Obtained','Result'],...M.checks.map(c=>[c.name,c.req,c.got,c.ok?'Pass':'Fail'])]),'Checks');
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Quantity','Value','Unit'],...M.values.map(r=>[r[0],typeof r[1]==='number'?Math.round(r[1]*1e6)/1e6:r[1],r[2]])]),'Values');
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Item','Calculated','Guaranteed','Limit at test','Measured','Result'],...M.gt.map(r=>[r.item,isNaN(+r.calc)?r.calc:+r.calc,r.noG?'':r.g,r.max,r.meas??'',r.result])]),'Guarantees & tests');
+  if(CUR.comp) XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['#','Parameter','Specification','Offered / design value','Status'],...CUR.comp.map(r=>r.slice(0,5))]),'Compliance');
   const inp=[['Field','Value']]; for(const el of form.elements){ if(el.name) inp.push([el.name,el.value]); } XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(inp),'Inputs');
   const out=XLSX.write(wb,{bookType:'xlsx',type:'array'}); saveFile(fname('xlsx'),new Blob([out]));
 });
@@ -2459,7 +2649,7 @@ $('#rXlsx').addEventListener('click',()=>{
 const SKEY='rectDesigns.v1', LKEY='rectLast.v1';
 const sGet=k=>{ try{ return JSON.parse(localStorage.getItem(k)||'null'); }catch(e){ return null; } };
 const sSet=(k,v)=>{ try{ localStorage.setItem(k,JSON.stringify(v)); return true; }catch(e){ return false; } };
-function rSnapshot(){ const v={}; for(const el of rform.elements){ if(el.name) v[el.name]=el.value; } return {v,req:REQ,reqName:REQ_NAME,conf:[...R_CONF],gt:R_GT,ver:APP_VERSION,at:new Date().toISOString()}; }
+function rSnapshot(){ const v={}; for(const el of rform.elements){ if(el.name) v[el.name]=el.value; } return {v,req:REQ,reqName:REQ_NAME,conf:[...R_CONF],gt:R_GT,ver:APP_VERSION,at:new Date().toISOString(),sum:RCUR&&RCUR.M?RCUR.M.values:null}; }
 function rApply(s){ if(!s||!s.v) return; for(const el of rform.elements){ if(el.name&&s.v[el.name]!==undefined) el.value=s.v[el.name]; }
   if(s.ver!==APP_VERSION) setTimeout(()=>toast('This design was saved with '+(s.ver?'tool '+s.ver:'an older tool version')+'. It has been recalculated with '+APP_VERSION+', so results may differ slightly.'),1200);
   R_CONF=new Set(Array.isArray(s.conf)?s.conf:[]); R_GT=(s.gt&&typeof s.gt==='object')?{...gtDefaults(),...s.gt}:gtDefaults();
@@ -2488,7 +2678,7 @@ const LIB={mode:'local',cache:{},db:null,
     if(!r.ok) throw new Error('Supabase '+r.status); return method==='GET'?r.json():null; },
   async sbList(){ const rows=await this.sb('GET','?select=name,data,updated_at&order=updated_at.desc'); const c={}; for(const x of rows) c[x.name]=x.data; this.cache=c; }
 };
-function rList(sel){ const all=LIB.all(); const names=Object.keys(all).sort((a,b)=>(all[b].at||'').localeCompare(all[a].at||''));
+function rList(sel){ const all=LIB.all(); const names=Object.keys(all).filter(k=>!k.startsWith('round:')).sort((a,b)=>(all[b].at||'').localeCompare(all[a].at||''));
   const L=$('#savedList'); L.innerHTML=names.length?names.map(n=>'<option value="'+esc(n)+'">'+esc(n)+' — '+esc((all[n].v.kVA||'?')+' kVA, '+new Date(all[n].at).toLocaleDateString('en-GB'))+'</option>').join(''):'<option value="">No saved designs yet</option>';
   if(sel&&all[sel]) L.value=sel; $('#libMode').textContent=LIB.label();
   const local=sGet(SKEY)||{}; const missing=Object.keys(local).filter(k=>!all[k]); const pb=$('#pushLocal'); pb.hidden=!(LIB.mode!=='local'&&missing.length); pb.textContent='Copy '+missing.length+' design'+(missing.length>1?'s':'')+' from this browser to the shared library'; }
@@ -2527,6 +2717,124 @@ function rShowAlts(o){ const cols=[['Core W × D',a=>a.W+' × '+a.D],['K / B',a=
     for(const [pre,C] of [['lv',a.C1],['hv',a.C2]]){ set(pre+'Type',C.type); set(pre+'B',C.b); set(pre+'H',C.type==='round'?'':C.h); set(pre+'Rad',C.rad); set(pre+'Ax',C.ax); }
     toast('Alternative copied into the design fields.'); rRun(); }); }
 const _rRenderPrev=rRender; rRender=function(o,M){ _rRenderPrev(o,M); rShowAlts(o); };
+
+</script>
+<script>
+// ================= Round core: saved designs, requirement import, compliance; adapters for extras =================
+// Loaded last, after both modules. Round designs share the design library with the prefix "round:".
+let ROUND_REQ=[], ROUND_REQ_NAME='', ROUND_CONF=new Set();
+const OKEY=n=>'round:'+n;
+function oSnapshot(){ const v={}; for(const el of form.elements){ if(el.name) v[el.name]=el.value; }
+  return {kind:'round',v,req:ROUND_REQ,reqName:ROUND_REQ_NAME,conf:[...ROUND_CONF],gt:R_GT_ROUND,ver:APP_VERSION,at:new Date().toISOString(),sum:CUR&&CUR.M?CUR.M.values:null}; }
+function oApply(s){ if(!s||!s.v) return; for(const el of form.elements){ if(el.name&&s.v[el.name]!==undefined) el.value=s.v[el.name]; }
+  ROUND_REQ=Array.isArray(s.req)?s.req:[]; ROUND_REQ_NAME=s.reqName||''; ROUND_CONF=new Set(Array.isArray(s.conf)?s.conf:[]); R_GT_ROUND=(s.gt&&typeof s.gt==='object')?{...gtDefaults(),...s.gt}:gtDefaults();
+  $('#oReqStatus').textContent=ROUND_REQ.length?'Requirement: '+ROUND_REQ_NAME+' ('+ROUND_REQ.length+' rows).':'No requirement sheet imported. Import one to get the compliance tab.';
+  if(s.ver!==APP_VERSION) setTimeout(()=>toast('This design was saved with '+(s.ver?'tool '+s.ver:'an older tool version')+'. It has been recalculated with '+APP_VERSION+', so results may differ slightly.'),1200);
+  run(); }
+function oList(sel){ const all=LIB.all(); const names=Object.keys(all).filter(k=>k.startsWith('round:')).sort((a,b)=>(all[b].at||'').localeCompare(all[a].at||''));
+  const L=$('#oSavedList'); L.innerHTML=names.length?names.map(k=>'<option value="'+esc(k)+'">'+esc(k.slice(6))+' — '+esc((all[k].v.kVA||'?')+' kVA, '+new Date(all[k].at).toLocaleDateString('en-GB'))+'</option>').join(''):'<option value="">No saved designs yet</option>';
+  if(sel&&all[sel]) L.value=sel; $('#oLibMode').textContent=LIB.label(); }
+$('#oSaveBtn').addEventListener('click',async()=>{ const s=oSnapshot(); const name=$('#oSaveName').value.trim()||((s.v.kVA||'')+' kVA '+(s.v.hvV||'')+'/'+(s.v.lvV||'')+' V');
+  const key=OKEY(name), exists=!!LIB.all()[key]; try{ await LIB.save(key,s); oList(key); $('#oSaveName').value=''; toast((exists?'Updated ':'Saved ')+'"'+name+'"'); }catch(e){ toast('Could not save: '+e.message); } });
+$('#oLoadBtn').addEventListener('click',()=>{ const k=$('#oSavedList').value; const s=LIB.all()[k]; if(!s){ toast('Choose a saved design first.'); return; } oApply(s); toast('Loaded "'+k.slice(6)+'"'); });
+$('#oDelBtn').addEventListener('click',async()=>{ const k=$('#oSavedList').value; if(!k||!LIB.all()[k]) return; try{ await LIB.del(k); oList(); toast('Deleted "'+k.slice(6)+'"'); }catch(e){ toast('Could not delete: '+e.message); } });
+// keep both lists in sync when the shared library updates
+const _rListPrev=rList; rList=function(sel){ _rListPrev(sel); if(document.getElementById('oSavedList')) oList(); };
+// compare buttons (both modules)
+$('#oCmpBtn').addEventListener('click',()=>{ const box=$('#oCmp'); box.hidden=!box.hidden; if(!box.hidden){ const all=LIB.all(); compareRender('#oCmp',Object.keys(all).filter(k=>k.startsWith('round:')).map(k=>k.slice(6)),n=>all[OKEY(n)]); } });
+$('#rCmpBtn').addEventListener('click',()=>{ const box=$('#rCmp'); box.hidden=!box.hidden; if(!box.hidden){ const all=LIB.all(); compareRender('#rCmp',Object.keys(all).filter(k=>!k.startsWith('round:')),n=>all[n]); } });
+// remember the last round-core inputs too
+function roundAfterRun(){ try{ localStorage.setItem('roundLast.v1',JSON.stringify(oSnapshot())); }catch(e){} roundCompRender(); }
+
+// ---- requirement sheet import (same sheet layout as the rectangular module) ----
+$('#oReqFile').addEventListener('change',async e=>{ const file=e.target.files[0]; if(!file) return;
+  try{ const wb=XLSX.read(await file.arrayBuffer()); const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''}); const items=[]; let fat=false;
+    for(const r of rows){ const cells=r.map(c=>String(c).trim()).filter(c=>c!==''); if(!cells.length) continue; if(/^s\.?\s*no/i.test(cells[0])) continue; if(/^fat/i.test(cells[0])&&cells.length===1){ fat=true; continue; }
+      const txt=cells.filter(c=>!/^\d+$/.test(c)); if(txt.length<2) continue; items.push([fat?'test':reqKey(txt[0]),(fat?'FAT: ':'')+txt[0],txt[txt.length-1]]); }
+    if(!items.length) throw new Error('no parameter rows found');
+    const find=k=>(items.find(x=>x[0]===k)||[])[2]||''; const num=(s,re)=>{ const m=String(s).match(re||/([\d.]+)/); return m?parseFloat(m[1]):null; };
+    const set=(k,v)=>{ if(v!==null&&v!==undefined&&v!==''&&form.elements[k]) form.elements[k].value=v; };
+    set('kVA',num(find('kva'))); set('freq',num(find('phase'),/(\d+)\s*hz/i));
+    const a=num(find('pri')), b=num(find('sec')); if(a&&b){ set('hvV',Math.max(a,b)); set('lvV',Math.min(a,b)); }
+    const vg=find('vg').replace(/\s/g,''); if(vg){ const opt=[...form.vg.options].find(o=>o.value.toLowerCase()===vg.toLowerCase()); if(opt) form.vg.value=opt.value; }
+    const imp=find('imp'); if(num(imp)) set('zTarget',num(imp)); const ins=find('ins').match(/class\s*([A-Z])/i); if(ins&&/[BFH]/i.test(ins[1])) set('insClass',ins[1].toUpperCase());
+    const mat=find('mat'); if(/alu/i.test(mat)){ set('lvMat','Al'); set('hvMat','Al'); } if(/copp/i.test(mat)){ set('lvMat','Cu'); set('hvMat','Cu'); }
+    const core=find('core'); if(/m3/i.test(core)) set('grade','M3-0.23'); else if(/zdmh/i.test(core)) set('grade','23ZDMH-0.23'); else if(/m4|crgo/i.test(core)) set('grade','M4-0.27');
+    set('noiseMax',num(find('noise'),/(\d+)\s*db/i)); const amb=find('rise').match(/ambient[^\d]*(\d+)/i); if(amb) set('amb',amb[1]);
+    ROUND_REQ=items; ROUND_REQ_NAME=file.name.replace(/\.[^.]+$/,''); ROUND_CONF=new Set();
+    $('#oReqStatus').textContent='Requirement imported: '+file.name+' ('+items.length+' rows). See the Compliance tab.'; toast('Requirement sheet imported'); run();
+  }catch(err){ console.error(err); toast('Could not read that sheet: '+err.message+'. Use a sheet with Parameter and Specification columns.'); }
+  e.target.value=''; });
+
+// ---- compliance (round core) ----
+function roundCompRows(o){ const p=o.inp, m=CUR.meta, ck=n=>o.checks.find(c=>c.name.startsWith(n)); const cn=c=>c==='D'?'delta':'star';
+  const zOk=ck('Impedance'), riseOk=ck('LV / HV winding rise');
+  const offer={kva:[p.kVA+' kVA',null],phase:['3 phase, '+p.freq+' Hz',null],app:['Designed for linear loads',true],
+    pri:[p.hvV+' V '+cn(p.hvConn)+' / '+p.lvV+' V '+cn(p.lvConn),null],sec:[p.lvV+' V, '+cn(p.lvConn),null],vg:[m.vg,null],
+    eff:['Efficiency '+o.loss.eff100.toFixed(2)+' % at 100 % load, pf 1',null],imp:[o.imp.ek.toFixed(2)+' % @'+p.refTemp+' °C',zOk?zOk.ok:true],ins:['Class '+p.insClass,null],
+    rise:['LV '+o.lv.grad.toFixed(1)+' K, HV '+o.hv.grad.toFixed(1)+' K (limit '+o.riseLim.toFixed(0)+' K)',riseOk?riseOk.ok:true],cool:['AN, natural air cooled',true],
+    mat:['LV '+p.lvMat+', HV '+p.hvMat,null],core:['CRGO '+p.grade+', '+o.core.B.toFixed(3)+' T',true],std:['IS 11171 / IS 2026 / IEC 60076-11',true],
+    mech:[p.enclosure?('Enclosure '+o.dims.eL+' × '+o.dims.eB+' × '+o.dims.eH):('Active part '+o.dims.activeL+' × '+o.dims.activeB+' × '+o.dims.activeH),true],
+    wt:[Math.round(o.wts.total)+' kg',true],hv:[o.cls.pf+' kV AC / '+o.cls.li+' kVp',true],noise:['Estimate '+o.noise.toFixed(0)+' dB(A) (to be measured at FAT)',p.noiseMax?o.noise<=p.noiseMax:true],
+    encl:[p.enclosure?'IP23 enclosure supplied':'Not supplied',true],other:['Noted',true]};
+  const numEq=(spec,val)=>{ const mm=String(spec).match(/([\d.]+)/); return !mm||Math.abs(parseFloat(mm[1])-val)<0.01; };
+  return ROUND_REQ.map(([k,param,spec],i)=>{ const key=k||reqKey(param); let [v,ok]=offer[key]||offer.other;
+    if(key==='kva') ok=numEq(spec,p.kVA); if(key==='vg') ok=!spec||String(spec).replace(/\s/g,'').toLowerCase().includes(m.vg.toLowerCase());
+    if(key==='pri'||key==='sec'){ const mm=String(spec).match(/([\d.]+)/); ok=!mm||[p.hvV,p.lvV].some(x=>Math.abs(x-parseFloat(mm[1]))<0.5); }
+    if(key==='eff'){ const mm=String(spec).match(/([\d.]+)/); ok=!mm||o.loss.eff100>=parseFloat(mm[1]); }
+    if(key==='mat') ok=!/alu|copp/i.test(spec)||(/alu/i.test(spec)?(p.lvMat==='Al'&&p.hvMat==='Al'):(p.lvMat==='Cu'&&p.hvMat==='Cu'));
+    if(key==='ins'){ const mm=String(spec).match(/class\s*([A-Z])/i); ok=!mm||mm[1].toUpperCase()===p.insClass; }
+    if(R_DECL.has(key)) return [String(i+1),param,spec,v,ROUND_CONF.has(param)?'Confirmed':'To confirm',key,true];
+    return [String(i+1),param,spec,v,ok===false?'Does not comply':'Complies',key,false]; }); }
+function roundCompRender(){ const el=$('#oComp'); if(!el||!CUR) return;
+  if(!ROUND_REQ.length){ el.innerHTML='<h3>Compliance</h3><p class="hint">Import the customer requirement sheet (button at the top of the form) to check this design against it row by row.</p>'; return; }
+  const rows=roundCompRows(CUR.o); CUR.comp=rows;
+  el.innerHTML='<h3>Compliance with '+esc(ROUND_REQ_NAME)+'</h3><p class="hint">Calculated rows are checked automatically. Rows the tool cannot calculate stay "To confirm" until you tick them.</p><div class="tblwrap"><table><tr><th>#</th><th>Parameter</th><th>Specification</th><th>Offered / design value</th><th>Status</th></tr>'+
+    rows.map(r=>'<tr><td>'+r[0]+'</td><td>'+esc(r[1])+'</td><td>'+esc(r[2])+'</td><td>'+esc(r[3])+'</td><td style="font-weight:600;white-space:nowrap;color:'+({Complies:'#2E7D4F',Confirmed:'#2E7D4F','To confirm':'#9A6B00'}[r[4]]||'#B23A2E')+'">'+(r[6]?'<label class="conf"><input type="checkbox" data-oconf="'+esc(r[1])+'"'+(r[4]==='Confirmed'?' checked':'')+'> '+r[4]+'</label>':r[4])+'</td></tr>').join('')+'</table></div>';
+  el.querySelectorAll('[data-oconf]').forEach(cb=>cb.addEventListener('change',()=>{ cb.checked?ROUND_CONF.add(cb.dataset.oconf):ROUND_CONF.delete(cb.dataset.oconf); roundCompRender(); roundAfterRun(); })); }
+
+// ---- adapters for the shared extras ----
+EXTRAS.register('rect',{kind:'rect',
+  ready:()=>!!RCUR&&!$('#rInputCheck').classList.contains('err'), errMsg:()=>$('#rInputCheck').classList.contains('err')?'Fix the highlighted inputs first.':'Calculate a design first.',
+  gtpData:()=>rGtpData(RCUR.o,RCUR.meta), meta:()=>RCUR.meta, gtSummary:()=>rGtSummary(RCUR.o), gtState:()=>R_GT, drawing:pr=>rDrawing(RCUR.o,pr), fileName:rfname,
+  pdRequired:()=>Math.max(RCUR.o.p.priV,RCUR.o.p.secV)>=3600,
+  plateExtra:()=>({title:'Dry-type transformer, rectangular core',ecf:RCUR.meta.env,altitude:(RCUR.o.p.altitude||1000)+' m',taps:[]}),
+  cadParams:()=>{ const o=RCUR.o, p=o.p; return [['Core_W',o.W,'mm','Core (lamination) width'],['Core_D',o.D,'mm','Core build (stack)'],['Limb_H',o.limb,'mm','Limb / window height'],['Window_W',o.winW,'mm','Window width'],
+    ['Centre_C',o.Cd,'mm','Limb centre distance'],['Yoke_L',o.yokeL,'mm','Yoke length'],['Yoke_H',o.W,'mm','Yoke height'],['Bobbin_gap',p.gap/2,'mm','Core to inner winding, per side'],
+    ['Inner_ID_W',o.ID1w,'mm','Inner winding inside, W direction'],['Inner_ID_D',o.ID1d,'mm','Inner winding inside, D direction'],['Inner_OD_W',o.OD1w,'mm','Inner winding outside, W'],['Inner_OD_D',o.OD1d,'mm','Inner winding outside, D'],
+    ['Inner_len',o.len1,'mm','Inner winding axial length'],['Inner_rad',o.rad1,'mm','Inner winding radial depth'],['Gap_delta',p.delta/2,'mm','Inner to outer gap, per side'],
+    ['Outer_ID_W',o.ID2w,'mm','Outer winding inside, W'],['Outer_ID_D',o.ID2d,'mm','Outer winding inside, D'],['Outer_OD_W',o.OD2w,'mm','Outer winding outside, W'],['Outer_OD_D',o.OD2d,'mm','Outer winding outside, D'],
+    ['Outer_len',o.len2,'mm','Outer winding axial length'],['Outer_rad',o.rad2,'mm','Outer winding radial depth'],['Coil_gap_am',p.am,'mm','Coil to coil'],['R1',o.R[0],'mm','Corner radius, inner ID'],['R2',o.R[1],'mm','Corner radius, inner OD'],['R3',o.R[2],'mm','Corner radius, outer ID'],['R4',o.R[3],'mm','Corner radius, outer OD'],
+    ['Active_L',o.aL,'mm','Active part length'],['Active_B',o.aB,'mm','Active part breadth'],['Active_H',o.aH,'mm','Active part height'],['Overall_L',o.oL,'mm','Overall length'],['Overall_B',o.oB,'mm','Overall breadth'],['Overall_H',o.oH,'mm','Overall height'],
+    ['Inner_turns',o.N1,'','Turns per limb'],['Outer_turns',o.N2,'','Turns per limb'],['Inner_layers',o.L1,'',''],['Outer_layers',o.L2,'',''],['Core_mass',Math.round(o.coreMass*10)/10,'kg',''],['Total_mass',Math.round(o.totMass*10)/10,'kg','']]; },
+  batchTemplate:()=>{ const res=validateForm(rform,RECT_RULES,(v,b,w)=>rectCross(v,b,w,rform)); if(res.errs.length) return null; const {p}=rInputs();
+    return {...p,K:null,W:null,D:null,lvLayers:null,hvLayers:null,N1:null,N2:null,lvCond:null,hvCond:null,lvCondFixed:null,hvCondFixed:null,lvDucts:null,hvDucts:null,llTarget:null}; },
+  batchHead:()=>['kVA','Core W × D','B, T','K','Z %','NLL W','LL W','Total W','Eff %','Rise K','Mass kg','Price ₹','TOC ₹','Checks'],
+  batchRow:o=>[String(o.p.kVA),o.W+' × '+o.D,o.Bact.toFixed(3),String(o.p.K),o.ek.toFixed(2),String(Math.round(o.NLL)),String(Math.round(o.LL)),String(Math.round(o.NLL+o.LL)),o.eff.toFixed(2),String(Math.round(Math.max(o.rise1,o.rise2))),String(Math.round(o.totMass)),Math.round(o.cost).toLocaleString('en-IN'),(o.p.capA||o.p.capB)?Math.round(o.toc).toLocaleString('en-IN'):'—',(n=>n?n+' fail':'all pass')(o.checks.filter(c=>!c.ok).length)],
+  applyTypical:()=>{ const f=rform, mat=f.mat.value; f.B.value=1.4; f.J1.value=mat==='Al'?1.4:2.3; f.J2.value=mat==='Al'?1.5:2.5; for(const k of ['K','W','D','N1','N2','lvLayers','hvLayers','lvB','lvH','lvRad','lvAx','hvB','hvH','hvRad','hvAx','lvDucts','hvDucts']) if(f.elements[k]) f.elements[k].value='';
+    rRun(); return 'flux 1.4 T, current density '+f.J1.value+' / '+f.J2.value+' A/mm² ('+(mat==='Al'?'aluminium':'copper')+'), design fields cleared for automatic sizing'; }});
+EXTRAS.register('round',{kind:'round',
+  ready:()=>!!CUR&&!$('#inputCheck').classList.contains('err'), errMsg:()=>$('#inputCheck').classList.contains('err')?'Fix the highlighted inputs first.':'Calculate a design first.',
+  gtpData:()=>roundGtpData(CUR.o,CUR.meta), meta:()=>CUR.meta, gtSummary:()=>roundGtSummary(CUR.o), gtState:()=>R_GT_ROUND, drawing:pr=>roundDrawing(CUR.o,pr), fileName:fname,
+  pdRequired:()=>CUR.o.inp.hvV>=3600,
+  plateExtra:()=>({title:'Dry-type transformer, round core',ecf:'—',altitude:(CUR.o.inp.altitude||1000)+' m',taps:CUR.o.hv.taps.map((t,i)=>[String(i+1)+' ('+(t.pct>0?'+':'')+t.pct+'%)',String(Math.round(CUR.o.inp.hvV*(1+t.pct/100)))])}),
+  cadParams:()=>{ const o=CUR.o, c=o.core; const rows=[['Core_D',c.D,'mm','Core circle diameter'],['Core_steps',c.steps.length,'','Number of steps'],['Window_H',o.window,'mm','Window (limb) height'],['Centre_C',c.CD,'mm','Limb centre distance'],['Yoke_H',c.yoke,'mm','Yoke height (approx.)'],
+    ['LV_ID',o.lv.ID,'mm','LV inside diameter'],['LV_OD',o.lv.OD,'mm','LV outside diameter'],['LV_len',Math.round(o.window-2*o.lv.end),'mm','LV axial length'],['LV_end',o.lv.end,'mm','LV end clearance'],['LV_ducts',o.lv.ducts,'',''],['LV_duct_W',o.lv.ductT,'mm',''],
+    ['HV_ID',o.hv.ID,'mm','HV inside diameter'],['HV_OD',o.hv.OD,'mm','HV outside diameter'],['HV_coils',o.hv.coils,'','Coils per limb'],['HV_coil_len',Math.round(o.hv.coilLen*10)/10,'mm','Axial length of one coil'],['HV_coil_gap',o.hv.coilGap,'mm',''],['HV_end',o.hv.end,'mm','HV end clearance'],
+    ['Active_L',o.dims.activeL,'mm',''],['Active_B',o.dims.activeB,'mm',''],['Active_H',o.dims.activeH,'mm',''],['Encl_L',o.dims.eL,'mm',''],['Encl_B',o.dims.eB,'mm',''],['Encl_H',o.dims.eH,'mm',''],['Core_mass',Math.round(o.wts.core),'kg',''],['Total_mass',Math.round(o.wts.total),'kg','']];
+    c.steps.forEach((s,i)=>rows.push(['Step'+(i+1)+'_W',s.w,'mm','Step '+(i+1)+' width'],['Step'+(i+1)+'_T',Math.round(s.stack*10)/10,'mm','Step '+(i+1)+' total stack'])); return rows; },
+  batchTemplate:()=>{ const res=validateForm(form,ROUND_RULES,roundCross); if(res.errs.length) return null; const {p}=readInputs();
+    return {...p,window:null,coreDia:null,lvTurns:null,lvLayers:null,lvAx:null,lvRad:null,lvDucts:null,lvDuctT:null,hvCoils:null,hvDucts:null,llTarget:null}; },
+  batchHead:()=>['kVA','Core Ø','B, T','Window','Z %','NLL W','LL W','Total W','Eff %','Rise K','Mass kg','Price ₹','TOC ₹','Checks'],
+  batchRow:o=>[String(o.inp.kVA),String(o.core.D),o.core.B.toFixed(3),String(o.window),o.imp.ek.toFixed(2),String(Math.round(o.loss.NLL)),String(Math.round(o.loss.LL)),String(Math.round(o.loss.total)),o.loss.eff100.toFixed(2),String(Math.round(Math.max(o.lv.grad,o.hv.grad))),String(Math.round(o.wts.total)),Math.round(o.cost.total).toLocaleString('en-IN'),(o.inp.capA||o.inp.capB)?Math.round(o.toc).toLocaleString('en-IN'):'—',(n=>n?n+' fail':'all pass')(o.checks.filter(c=>!c.ok).length)],
+  applyTypical:()=>{ const f=form, kVA=parseFloat(f.kVA.value)||0, cu=f.lvMat.value==='Cu', cuH=f.hvMat.value==='Cu'; if(!kVA){ toast('Enter the kVA first.'); return ''; }
+    const z=STD.zMin(kVA); f.zTarget.value=z; if(kVA>100){ f.tapPlus.value=5; f.tapMinus.value=5; f.tapStep.value=2.5; } else { f.tapPlus.value=0; f.tapMinus.value=0; f.tapStep.value=0; }
+    f.k.value=cu?0.5:0.43; f.B.value=1.6; f.Jlv.value=cu?2.2:1.4; f.Jhv.value=cuH?2.4:1.5;
+    for(const k of ['window','coreDia','lvTurns','lvLayers','lvAx','lvRad','lvDucts','hvCoils','hvDucts']) if(f.elements[k]) f.elements[k].value='';
+    run(); return 'impedance '+z+' % (IEC 60076-5 minimum for '+kVA+' kVA), taps '+(kVA>100?'±5 % in 2.5 % steps':'none')+', k '+f.k.value+', flux 1.6 T, current density '+f.Jlv.value+' / '+f.Jhv.value+' A/mm²'; }});
+bindExtras(); oList();
+{ let last=null; try{ last=JSON.parse(localStorage.getItem('roundLast.v1')||'null'); }catch(e){} if(last&&last.v&&last.v.kVA){ ROUND_REQ=last.req||[]; ROUND_REQ_NAME=last.reqName||''; ROUND_CONF=new Set(last.conf||[]); R_GT_ROUND=(last.gt&&typeof last.gt==='object')?{...gtDefaults(),...last.gt}:gtDefaults();
+  for(const el of form.elements){ if(el.name&&last.v[el.name]!==undefined) el.value=last.v[el.name]; } if(ROUND_REQ.length) $('#oReqStatus').textContent='Requirement: '+ROUND_REQ_NAME+' ('+ROUND_REQ.length+' rows).'; run(); } }
 
 </script>
 </body>

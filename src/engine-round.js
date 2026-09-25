@@ -24,15 +24,16 @@ function hvClass(kVline){ if(kVline<=1.1) return {um:1.1,hvEnd:40,gap:10,phase:1
 
 // Stepped core: optimise step widths on a 5 mm grid, return steps & net area
 const _sc={};
-function stepCore(D,n,sf){ const key=D+'|'+n+'|'+sf; if(_sc[key]) return _sc[key]; return (_sc[key]=stepCore0(D,n,sf)); }
-function stepCore0(D,n,sf){
-  const R=D/2; let w=[]; for(let k=1;k<=n;k++){ const th=(k-0.5)/n*Math.PI/2*0.98; w.push(Math.max(20,Math.floor(2*R*Math.cos(th)/5)*5)); }
+// Stepped core. mult = step-width multiple (mm), minW = narrowest step (mm); defaults 5 and 20.
+function stepCore(D,n,sf,mult,minW){ mult=mult||5; minW=minW||20; const key=D+'|'+n+'|'+sf+'|'+mult+'|'+minW; if(_sc[key]) return _sc[key]; return (_sc[key]=stepCore0(D,n,sf,mult,minW)); }
+function stepCore0(D,n,sf,mult,minW){
+  const R=D/2; let w=[]; for(let k=1;k<=n;k++){ const th=(k-0.5)/n*Math.PI/2*0.98; w.push(Math.max(minW,Math.floor(2*R*Math.cos(th)/mult)*mult)); }
   w=[...new Set(w)].sort((a,b)=>b-a);
   const area=(ws)=>{ let prev=0,A=0; for(const x of ws){ if(x>D) return -1; const y=Math.sqrt(R*R-(x/2)**2); A+=x*2*(y-prev); prev=y;} return A; };
   let best=area(w), improved=true, it=0;
   while(improved&&it<200){ improved=false; it++;
-    for(let i=0;i<w.length;i++) for(const d of [-5,5]){ const t=w.slice(); t[i]+=d;
-      if(t[i]<20||t[i]>D-1) continue; if(i>0&&t[i]>=t[i-1]) continue; if(i<t.length-1&&t[i]<=t[i+1]) continue;
+    for(let i=0;i<w.length;i++) for(const d of [-mult,mult]){ const t=w.slice(); t[i]+=d;
+      if(t[i]<minW||t[i]>D-1) continue; if(i>0&&t[i]>=t[i-1]) continue; if(i<t.length-1&&t[i]<=t[i+1]) continue;
       const a=area(t); if(a>best+1e-9){best=a;w=t;improved=true;} } }
   let prev=0; const steps=w.map(x=>{ const y=Math.sqrt(R*R-(x/2)**2); const s=2*(y-prev); prev=y; return {w:x,stack:s,net:x*s*sf}; });
   return {steps,gross:best,net:best*sf,util:best/(Math.PI*R*R)};
@@ -58,8 +59,8 @@ function design(p){
   S(4,'Net core area required','A = V/T ÷ (4.44 × f × B × 10⁻⁶) = '+r1(vt,4)+' ÷ (4.44 × '+f+' × '+p.B+' × 10⁻⁶)', Math.round(Areq)+' mm²');
   let D=p.coreDia||Math.floor(Math.sqrt(4*Areq/(Math.PI*0.92))*0.97), core;
   const nSteps=(d)=>p.coreSteps||(d<120?6:d<180?8:d<250?10:d<350?12:14);
-  if(p.coreDia){ core=stepCore(D,nSteps(D),p.sf); }
-  else { for(let g=0;g<400;g++){ core=stepCore(D,nSteps(D),p.sf); if(core.net>=Areq) break; D++; } }
+  if(p.coreDia){ core=stepCore(D,nSteps(D),p.sf,p.stepMult,p.minStep); }
+  else { for(let g=0;g<400;g++){ core=stepCore(D,nSteps(D),p.sf,p.stepMult,p.minStep); if(core.net>=Areq) break; D++; } }
   const Anet=core.net, Bact=vt/(4.44*f*Anet*1e-6);
   S(5,'Gross core area / core factor','Gross = Net ÷ core factor = '+Math.round(Areq)+' ÷ '+r1(core.net/(Math.PI*D*D/4),3), Math.round(Areq/(core.net/(Math.PI*D*D/4)))+' mm²','Core factor = stacking × step utilisation');
   S(6,'Core diameter','D = √(Gross ÷ π/4), then stepped with '+core.steps.length+' steps', D+' mm','Net area obtained '+Math.round(Anet)+' mm² → B = '+r1(Bact,3)+' T');

@@ -10,6 +10,8 @@
     <div class="saverow"><input id="saveName" placeholder="Name, e.g. 8 kVA round wire" aria-label="Design name"><button type="button" class="btn sm primary" id="saveBtn">Save</button></div>
     <div class="saverow three"><select id="savedList" aria-label="Saved designs"><option value="">No saved designs yet</option></select><button type="button" class="btn sm" id="loadBtn">Load</button><button type="button" class="btn sm" id="delBtn">Delete</button></div>
     <div class="saverow two"><button type="button" class="btn sm" id="expBtn">Export (.json)</button><label class="btn sm filebtn">Load file (.json / Excel)<input type="file" id="impFile" accept=".json,.xlsx" hidden></label></div>
+    <div class="saverow one"><button type="button" class="btn sm" id="rCmpBtn">Compare two saved designs</button></div>
+    <div id="rCmp" hidden></div>
     <div class="saverow one"><button type="button" class="btn sm" id="pushLocal" hidden>Copy this browser's designs to the shared library</button></div>
   </div>
   <p class="hint" id="reqStatus">Requirement: TRX 70 kVA, 433 V / 400 V, Al, Dyn11 (built in).</p>
@@ -76,8 +78,15 @@
       <label><b>h</b><input name="hvH" type="number" step="0.05" placeholder="auto"></label>
       <label><b>Rad × Ax</b><span class="pair"><input name="hvRad" type="number" placeholder="–" aria-label="radial parallels"><input name="hvAx" type="number" placeholder="–" aria-label="axial parallels"></span></label>
     </div>
+    <div class="saverow one"><button type="button" class="btn sm" data-typical="rect">Fill typical values for this rating</button></div>
     <p class="hint" id="rAutoNote"></p>
     <button type="button" class="btn sm" id="rFix" hidden>Copy the automatic values into the fields</button>
+  </details>
+  <details class="sec">
+    <summary>Rating range <small>design many ratings at once</small></summary>
+    <label><b>Ratings, kVA</b><input id="rBatchList" placeholder="e.g. 25, 50, 70, 100, 150" value="25, 50, 70, 100, 150"></label>
+    <div class="saverow one"><button type="button" class="btn sm primary" data-batch="rect" data-input="rBatchList" data-out="#rBatch">Design all ratings</button></div>
+    <p class="hint">Uses the current requirement (voltages, material, limits, prices) and designs each rating automatically. Results appear above the design sheet with an Excel download.</p>
   </details>
   <details class="sec">
     <summary>Targets and costing <small>optional</small></summary>
@@ -144,6 +153,8 @@
       <label><b>Revision</b><input name="rev" placeholder="R0"></label>
       <label><b>Customer PO</b><input name="po"></label>
       <label><b>Drawing no.</b><input name="dwg"></label>
+      <label class="full"><b>Your company name (on all PDFs)</b><input data-company="name" placeholder="shown next to the logo"></label>
+      <div class="full saverow two"><label class="btn sm filebtn">Company logo (PNG/JPG)<input type="file" data-company="logo" accept="image/png,image/jpeg" hidden></label><button type="button" class="btn sm" data-company="clear">Remove logo <span data-company-status></span></button></div>
     </div>
   </details>
 </form>
@@ -159,12 +170,19 @@
     <div class="exports">
       <button class="btn primary" id="rPdf">Download PDF</button>
       <button class="btn" id="rXlsx">Download Excel</button>
-      <button class="btn" id="rGtp">GTP (PDF)</button>
+      <details class="more"><summary class="btn">More downloads ▾</summary><div class="menu">
+        <button type="button" data-more="gtp" data-mod="rect" id="rGtp">GTP (PDF)</button>
+        <button type="button" data-more="plate" data-mod="rect">Rating plate (PDF)</button>
+        <button type="button" data-more="cert" data-mod="rect">Routine test certificate (PDF)</button>
+        <button type="button" data-more="dxf" data-mod="rect">Drawings (DXF, for CAD)</button>
+        <button type="button" data-more="cad" data-mod="rect">CAD parameters (Excel)</button>
+      </div></details>
     </div>
   </div>
   <div class="inputcheck" id="rInputCheck" role="alert"></div>
   <div class="kpis" id="rKpis"></div>
   <div class="warns" id="rWarns"><strong>Does not meet the requirement yet</strong><ul></ul></div>
+  <div class="alts" id="rBatch"></div>
   <div class="alts" id="rAlts"></div>
   <p class="okline" id="rOk">Meets every checked requirement: impedance, efficiency, temperature rise, ratio error, flux and current density.</p>
   <section id="rtab-sheet">
