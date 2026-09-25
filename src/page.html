@@ -424,7 +424,8 @@ function buildModel(o,m){
     ['S.C. hoop stress HV',f1(o.sc.windings[1].sigma,1)+' MPa (limit '+o.sc.windings[1].stressLim+')'],
     ...(o.loss.lead?[['Lead loss (included in load loss)',f0(o.loss.lead)+' W']]:[]),
     ...((p.capA||p.capB)?[['Total owning cost','₹ '+f0(o.toc)+' (price + '+f0(p.capA||0)+' ₹/kW × NLL + '+f0(p.capB||0)+' ₹/kW × LL)']]:[]),
-    ['Flux at '+(p.ovPct??10)+' % over-voltage',f1(o.overflux.Bov,3)+' T']];
+    ['Flux at '+(p.ovPct??10)+' % over-voltage',f1(o.overflux.Bov,3)+' T'],
+    ['Hot-spot (IEC 60076-12)',f0(o.hs.tHS)+' °C (max '+o.hs.max+')'],['Insulation life at continuous rated load',f1(o.hs.lifeY,1)+' years at '+(p.amb??40)+' °C ambient']];
   const clr=[['Core to LV',p.coreLV+' mm'],['LV to HV (radial)',hv.gap+' mm'],['HV to HV (phase)',hv.phase+' mm'],['HV coil to coil',hv.coilGap+' mm'],['LV / HV end',lv.end+' / '+hv.end+' mm'],['Insulation level','Um '+o.cls.um+' kV']];
   const wts=[['Active part L × B × H',f0(o.dims.activeL)+' × '+f0(o.dims.activeB)+' × '+f0(o.dims.activeH)+' mm'],
     ['Enclosure L × B × H',p.enclosure?(f0(o.dims.eL)+' × '+f0(o.dims.eB)+' × '+f0(o.dims.eH)+' mm'):'—'],
@@ -465,7 +466,7 @@ function renderKpis(o){
 }
 // Round core: A) plan section through the windings of all three limbs, showing the stepped core;
 // B) section through one limb along its axis, showing LV layers, HV coils and ducts. Everything to scale in mm.
-function roundDrawing(o,print){ const P=drwPal(print), c=o.core, lv=o.lv, hv=o.hv, Hw=o.window, yoke=c.yoke, CD=c.CD;
+function roundDrawing(o,print,meta){ const P=drwPal(print), c=o.core, lv=o.lv, hv=o.hv, Hw=o.window, yoke=c.yoke, CD=c.CD;
   const planL=2*CD+hv.OD, Z=2*yoke+Hw; const width=Math.max(planL,Z); const fs=Math.max(11,width/58), sw=fs*0.07;
   const mL=fs*6.5, W_=width+mL+fs*7;
   // ---- A: plan
@@ -507,7 +508,8 @@ function roundDrawing(o,print){ const P=drwPal(print), c=o.core, lv=o.lv, hv=o.h
   const H_=yN+fs*2.6+fs*1.5; let lxx=mL; const yl=H_-fs*0.9;
   const leg=(fill,edge,label)=>{ const r=DRW.rect(lxx,yl-fs*0.8,fs*1.1,fs*0.9,fill,edge,sw)+DRW.text(lxx+fs*1.5,yl,label,P,fs*0.9,{anchor:'start'}); lxx+=fs*1.5+label.length*fs*0.5+fs*1.6; return r; };
   s+=leg(P.core,P.coreEdge,'Core '+o.inp.grade)+leg(P.lv,P.lvEdge,'LV '+lv.N+' turns')+leg(P.hv,P.hvEdge,'HV '+hv.Nn+' turns (normal tap)');
-  return DRW.svgOpen(W_,H_+fs*0.6,P,fs,'Round core: plan through the windings and section through one limb, dimensioned in millimetres')+s+'</svg>'; }
+  const svg=DRW.svgOpen(W_,H_+fs*0.6,P,fs,'Round core: plan through the windings and section through one limb, dimensioned in millimetres')+s+'</svg>';
+  return (print&&meta)?addTitleBlock(svg,titleMeta('round',meta,o.inp.kVA+' kVA, '+o.inp.hvV+' / '+o.inp.lvV+' V, '+meta.vg+', core Ø'+o.core.D)):svg; }
 function renderSVG(o){ $('#svgwrap').innerHTML=roundDrawing(o,false); }
 let ROUND_SEQ=0;
 function run(){
@@ -575,7 +577,7 @@ function pdfFirstPage(make,fonts){ fonts=fonts||[6.4,6,5.6,5.3]; let d=null;
   for(const fs of fonts){ d=make(fs); if(d.getNumberOfPages()===1) return d; } return d; }
 $('#dlPdf').addEventListener('click',async()=>{
   if(!CUR) return; if($('#inputCheck').classList.contains('err')){ toast('Fix the highlighted inputs first.'); return; } if(!window.jspdf){ toast('PDF library did not load. Check your connection and reload.'); return; }
-  const png=await svgToPng(roundDrawing(CUR.o,true),2800);
+  const png=await svgToPng(roundDrawing(CUR.o,true,CUR.meta),2800);
   const {jsPDF}=window.jspdf; const M=CUR.M; const P=v=>v.map(r=>r.map(pdfText));
   const ink=[23,33,43], head=[228,233,238];
   const B=(fs)=>({theme:'grid',styles:{fontSize:fs,cellPadding:fs*0.1,lineColor:[150,160,170],lineWidth:0.15,textColor:ink},headStyles:{fillColor:head,textColor:ink,fontStyle:'bold'},columnStyles:{0:{fontStyle:'bold'}}});
@@ -583,7 +585,7 @@ $('#dlPdf').addEventListener('click',async()=>{
   const title=(d,t)=>{ d.setTextColor(...ink); d.setFont('helvetica','bold'); d.setFontSize(11); d.text(pdfText(t),8,12); };
   // page 1: title block, winding data, core, performance, dimensions
   const d=pdfFirstPage((fs)=>{ const d=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
-    d.setDrawColor(...ink); d.setLineWidth(0.5); d.rect(8,8,281,27); d.setFont('helvetica','bold'); d.setFontSize(11); d.setTextColor(...ink); d.text(pdfText(M.title.title),10,13);
+    d.setDrawColor(...ink); d.setLineWidth(0.5); d.rect(8,8,281,27); d.setFont('helvetica','bold'); d.setFontSize(11); d.setTextColor(...ink); d.text(pdfText(M.title.title),10,13); pdfBrand(d,222,9.5,64,7); pdfBrand(d,222,9.2,64,7.6);
     d.setFont('helvetica','normal'); d.setFontSize(6.4); M.title.cells.forEach((c,i)=>{ const x=10+(i%6)*46.5, y=18+Math.floor(i/6)*5.6; d.setTextColor(90); d.text(pdfText(c[0]),x,y); d.setTextColor(...ink); d.text(pdfText(c[1]).slice(0,40),x,y+2.6); });
     d.autoTable({...B(fs),startY:38,margin:{left:8,right:150,bottom:9},head:[['Winding data','LV (inner)','HV (outer)']],body:P(M.wind),columnStyles:{0:{fontStyle:'bold',cellWidth:38}}});
     let y=38; const sec=(h,body)=>{ d.autoTable({...B(fs),startY:y,margin:{left:152,right:8,bottom:9},head:[[h,'']],body:P(body)}); y=d.lastAutoTable.finalY+1; };

@@ -120,6 +120,8 @@
       <label><b>Rise calibration inner / outer</b><span class="pair"><input name="riseCal1" type="number" step="0.01" aria-label="inner rise calibration"><input name="riseCal2" type="number" step="0.01" aria-label="outer rise calibration"></span></label>
       <label><b>Noise constant A / B-slope</b><span class="pair"><input name="noiseA" type="number" step="0.5" aria-label="noise constant"><input name="noiseB" type="number" step="1" aria-label="noise slope"></span></label>
       <label><b>Hoop stress limit Cu / Al, MPa</b><span class="pair"><input name="stressCu" type="number" step="1" aria-label="copper stress limit"><input name="stressAl" type="number" step="1" aria-label="aluminium stress limit"></span></label>
+      <label><b>Coil construction (bending check)</b><select name="bendModel"><option value="bonded">Resin-bonded / VPI (acts as one block)</option><option value="loose">Loose turns</option></select></label>
+      <label><b>Supports per straight side</b><input name="supports" type="number" min="0" step="1" placeholder="0" title="Spacer strips or bracing that shorten the free span of each straight coil side"></label>
       <label><b>Conductor bonding</b><select name="bonded"><option value="0">Regular strands (0.35 × Rp0.2)</option><option value="1">Resin-bonded (0.6 × Rp0.2)</option></select></label>
       <label><b>Axial length value</b><select name="roundLen"><option value="0">Exact (e.g. 138.33)</option><option value="1">Round to whole mm (as CAL1)</option></select></label>
       <label><b>Radial bulge factor</b><input name="bulge" type="number" step="0.01"></label>

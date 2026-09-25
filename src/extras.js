@@ -17,7 +17,7 @@ function bindCompany(){ document.querySelectorAll('[data-company="name"]').forEa
 // Draw the logo (fitted into w × h mm) and/or company name at (x, y) on a jsPDF page
 function pdfBrand(d,x,y,w,h){ const c=companyGet(); let used=0;
   if(c.logo){ try{ const fmt=c.logo.startsWith('data:image/png')?'PNG':'JPEG'; const p=d.getImageProperties(c.logo); const k=Math.min(w/p.width,h/p.height); d.addImage(c.logo,fmt,x+w-p.width*k,y,p.width*k,p.height*k); used=1; }catch(e){} }
-  if(c.name){ d.setFont('helvetica','bold'); d.setFontSize(9); d.setTextColor(23,33,43); d.text(pdfText(c.name),x+w-(used?w+2:0),y+4,{align:'right'}); }
+  if(c.name){ d.setFont('helvetica','bold'); d.setFontSize(9); d.setTextColor(23,33,43); const lw=used?Math.min(w,(d.getImageProperties(c.logo).width/d.getImageProperties(c.logo).height)*h):0; d.text(pdfText(c.name),x+w-(used?lw+2:0),y+h/2+1.5,{align:'right'}); }
 }
 
 // ---------- "More downloads" menu ----------

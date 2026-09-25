@@ -54,6 +54,11 @@ is('70 kVA over-voltage flux check passes (1.54 T ≤ 1.9 T)',r.checks.find(c=>/
 console.log('\nv1.4 features');
 { const q=X.design({...X.DEFAULTS,stepMult:10,minStep:30,coreSteps:8}); is('Core steps: 10 mm multiple, 30 mm minimum, 8 steps',q.core.steps.length===8&&q.core.steps.every(s=>s.w%10===0&&s.w>=30)); }
 { const d=X.design(X.DEFAULTS); is('Default core steps unchanged (Ø219, widest 215)',d.core.D===219&&d.core.steps[0].w===215); }
+console.log('\nv1.5 features (IEC 60076-12 hot-spot, straight-side bending)');
+{ const h=X.STD.hotSpot('H',50,114.484); near('Hot-spot 70 kVA: 50 + 1.25 × 114.5',h.tHS,193.1,0.1); is('Hot-spot within class H maximum 205 °C (Table 2)',h.ok&&h.max===205);
+  near('Normal life at rated hot-spot 170 °C = 180 000 h',X.STD.hotSpot('H',0,170/1.25).lifeH,180000,1500); near('Class F rated hot-spot life 145 °C',X.STD.hotSpot('F',0,145/1.25).lifeH,180000,1500); }
+{ const q=X.rectDesign({...X.RC_DEFAULTS,roundLen:true,supports:1}); const b=q.checks.filter(c=>/bending/.test(c.name));
+  is('Straight-side bending passes with one support per side',b.length===2&&b.every(c=>c.ok)); near('Outer bending, resin-bonded, 83 mm span',q.bend2,7.94,0.05); }
 console.log('\nStandards helpers');
 near('IEC ratio limit at Z = 2.91 %',X.STD.ratioLimit(2.91),0.291,1e-9); near('Altitude factor 2000 m',X.STD.altitudeFactor(2000),0.95,1e-9);
 near('Al σ @115 °C (61 % IACS)',X.STD.sigmaStd('Al',115),25.49,0.01); near('SC temp Al θ0=164.5 J=47.9 t=2',X.STD.scTemp('Al',164.5,47.9,2),251,1);

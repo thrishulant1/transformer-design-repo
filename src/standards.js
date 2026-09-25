@@ -1,5 +1,5 @@
 // ===== Shared standards helpers (used by both engines) =====
-const APP_VERSION='1.4.0 (25 Sep 2026)';
+const APP_VERSION='1.5.0 (25 Sep 2026)';
 const STD={};
 // Resistivity at 20 °C (Ω·mm²/m) and temperature constant: Cu 100 % IACS, EC aluminium 61 % IACS
 STD.RHO={Cu:{r20:0.017241,k:234.5},Al:{r20:0.028264,k:225}};
@@ -66,3 +66,10 @@ STD.reg=(er,ex,pf)=>{ const s=Math.sqrt(Math.max(0,1-pf*pf)); const a=er*pf+ex*s
 STD.toc=(cost,NLL,LL,capA,capB)=>cost+(capA||0)*NLL/1000+(capB||0)*LL/1000;
 // Over-excitation check: flux at the stated over-voltage must stay below the chosen limit
 STD.overflux=(B,ovPct,limit)=>{ const Bov=B*(1+(ovPct||0)/100); return {Bov,ok:Bov<=limit}; };
+
+// IEC 60076-12 (dry-type loading guide): hot-spot = ambient + Z × average winding rise, Z = 1.25 (clause 5.7).
+// Table 1: ageing constants a, b and rated hot-spot temperature (normal life 180 000 h); Table 2: maximum hot-spot temperature.
+STD.HS={A:{a:3.10e-14,b:15900,rated:95,max:130},E:{a:5.48e-15,b:17212,rated:110,max:145},B:{a:1.72e-15,b:18115,rated:120,max:155},
+  F:{a:9.60e-17,b:20475,rated:145,max:180},H:{a:5.35e-18,b:22979,rated:170,max:205}};
+STD.hotSpot=(cls,amb,riseAvg,Z)=>{ const h=STD.HS[cls]||STD.HS.H, z=Z||1.25; const dHS=z*riseAvg, tHS=amb+dHS; const life=h.a*Math.exp(h.b/(273+tHS));
+  return {Z:z,dHS,tHS,max:h.max,rated:h.rated,ok:tHS<=h.max,lifeH:life,lifeY:life/8760,ageing:180000/life}; };

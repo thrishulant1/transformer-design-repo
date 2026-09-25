@@ -74,7 +74,7 @@ function roundCompRender(){ const el=$('#oComp'); if(!el||!CUR) return;
 // ---- adapters for the shared extras ----
 EXTRAS.register('rect',{kind:'rect',
   ready:()=>!!RCUR&&!$('#rInputCheck').classList.contains('err'), errMsg:()=>$('#rInputCheck').classList.contains('err')?'Fix the highlighted inputs first.':'Calculate a design first.',
-  gtpData:()=>rGtpData(RCUR.o,RCUR.meta), meta:()=>RCUR.meta, gtSummary:()=>rGtSummary(RCUR.o), gtState:()=>R_GT, drawing:pr=>rDrawing(RCUR.o,pr), fileName:rfname,
+  gtpData:()=>rGtpData(RCUR.o,RCUR.meta), meta:()=>RCUR.meta, gtSummary:()=>rGtSummary(RCUR.o), gtState:()=>R_GT, drawing:pr=>rDrawing(RCUR.o,pr,RCUR.meta), fileName:rfname,
   pdRequired:()=>Math.max(RCUR.o.p.priV,RCUR.o.p.secV)>=3600,
   plateExtra:()=>({title:'Dry-type transformer, rectangular core',ecf:RCUR.meta.env,altitude:(RCUR.o.p.altitude||1000)+' m',taps:[]}),
   cadParams:()=>{ const o=RCUR.o, p=o.p; return [['Core_W',o.W,'mm','Core (lamination) width'],['Core_D',o.D,'mm','Core build (stack)'],['Limb_H',o.limb,'mm','Limb / window height'],['Window_W',o.winW,'mm','Window width'],
@@ -93,7 +93,7 @@ EXTRAS.register('rect',{kind:'rect',
     rRun(); return 'flux 1.4 T, current density '+f.J1.value+' / '+f.J2.value+' A/mm² ('+(mat==='Al'?'aluminium':'copper')+'), design fields cleared for automatic sizing'; }});
 EXTRAS.register('round',{kind:'round',
   ready:()=>!!CUR&&!$('#inputCheck').classList.contains('err'), errMsg:()=>$('#inputCheck').classList.contains('err')?'Fix the highlighted inputs first.':'Calculate a design first.',
-  gtpData:()=>roundGtpData(CUR.o,CUR.meta), meta:()=>CUR.meta, gtSummary:()=>roundGtSummary(CUR.o), gtState:()=>R_GT_ROUND, drawing:pr=>roundDrawing(CUR.o,pr), fileName:fname,
+  gtpData:()=>roundGtpData(CUR.o,CUR.meta), meta:()=>CUR.meta, gtSummary:()=>roundGtSummary(CUR.o), gtState:()=>R_GT_ROUND, drawing:pr=>roundDrawing(CUR.o,pr,CUR.meta), fileName:fname,
   pdRequired:()=>CUR.o.inp.hvV>=3600,
   plateExtra:()=>({title:'Dry-type transformer, round core',ecf:'—',altitude:(CUR.o.inp.altitude||1000)+' m',taps:CUR.o.hv.taps.map((t,i)=>[String(i+1)+' ('+(t.pct>0?'+':'')+t.pct+'%)',String(Math.round(CUR.o.inp.hvV*(1+t.pct/100)))])}),
   cadParams:()=>{ const o=CUR.o, c=o.core; const rows=[['Core_D',c.D,'mm','Core circle diameter'],['Core_steps',c.steps.length,'','Number of steps'],['Window_H',o.window,'mm','Window (limb) height'],['Centre_C',c.CD,'mm','Limb centre distance'],['Yoke_H',c.yoke,'mm','Yoke height (approx.)'],

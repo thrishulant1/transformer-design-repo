@@ -18,7 +18,7 @@ let REQ=REQ_DEFAULT.map(r=>r.slice()); let REQ_NAME='TRX 70 kVA, 433 V / 400 V, 
 const RBASE={kVA:70,freq:50,priV:433,secV:400,vg:'Dyn11',mat:'Al',zTarget:3,zTolPlus:0,zTolMinus:10,effMin:97,riseLimit:115,amb:50,windTemp:115,insClass:'H',grade:'M4-27',noiseMax:50,enclosure:'0',
   basis:'sheet',B:1.4,lvType:'strip',hvType:'strip',gap:12,delta:12,am:15,plateD:4,lvEnd:40,hvEndMin:40,ductW:8,ins:0.11,il:0.13,bulge:1.1,tankWkVA:1.5,extraTurn:1,roundLen:'0',coreFactor:1.32,buildF:1.5,clrL:250,clrB:260,
   pCore:270,pCond:440,pSteel:200,pFg:500,pClh:5950,pResin:650,pOthers:15,party:'Delta Electronics India',wo:'',sheetNo:'',by:'Meghana N T',appr:'Geetha B',
-  altitude:1000,kFactor:1,faultMVA:'',scTime:2,scRequired:'0',envClass:'E2',climClass:'C2',fireClass:'F1',condBasis:'standard',sigmaCustom:'',riseCal1:1,riseCal2:1,noiseA:22,noiseB:35,stressCu:80,stressAl:35,bonded:'0',
+  altitude:1000,kFactor:1,faultMVA:'',scTime:2,scRequired:'0',envClass:'E2',climClass:'C2',fireClass:'F1',condBasis:'standard',sigmaCustom:'',riseCal1:1,riseCal2:1,noiseA:22,noiseB:35,stressCu:80,stressAl:35,bonded:'0',bendModel:'bonded',supports:0,
   chk:'',rev:'R0',po:'',dwg:''};
 const RPRESETS={
   sheet70:{...RBASE,condBasis:'sheet',roundLen:'1',K:79,W:80,D:'',lvLayers:4,hvLayers:4,lvB:10.5,lvH:3.5,lvRad:1,lvAx:2,hvB:10.5,hvH:3.5,hvRad:1,hvAx:1,lvDucts:0,hvDucts:0},
@@ -39,7 +39,7 @@ function rInputs(){
     tankWkVA:n('tankWkVA')??1.5,extraTurn:n('extraTurn')??1,roundLen:rStr('roundLen')==='1',coreFactor:n('coreFactor')??1.32,buildF:n('buildF')??1.5,clrL:n('clrL')??250,clrB:n('clrB')??260,enclosure:rStr('enclosure')==='1',
     price:{core:n('pCore')??270,coreSteel:n('pSteel')??200,cond:n('pCond')??440,leads:n('pCond')??440,fg:n('pFg')??500,connFg:n('pFg')??500,clh:n('pClh')??5950,resin:n('pResin')??650,crca:90,others:n('pOthers')??15},
     altitude:n('altitude')??1000,kFactor:n('kFactor')??1,faultMVA:n('faultMVA'),scTime:n('scTime')??2,scRequired:rStr('scRequired')==='1',
-    condBasis:rStr('condBasis')||'standard',sigmaCustom:n('sigmaCustom'),riseCal1:n('riseCal1')??1,riseCal2:n('riseCal2')??1,noiseA:n('noiseA')??22,noiseB:n('noiseB')??35,stressCu:n('stressCu')??80,stressAl:n('stressAl')??35,bonded:rStr('bonded')==='1',llTarget:n('llTarget'),llTol:n('llTol')??5,capA:n('capA'),capB:n('capB'),ovPct:n('ovPct')??10,bSat:n('bSat')??1.9,
+    condBasis:rStr('condBasis')||'standard',sigmaCustom:n('sigmaCustom'),riseCal1:n('riseCal1')??1,riseCal2:n('riseCal2')??1,noiseA:n('noiseA')??22,noiseB:n('noiseB')??35,stressCu:n('stressCu')??80,stressAl:n('stressAl')??35,bonded:rStr('bonded')==='1',llTarget:n('llTarget'),llTol:n('llTol')??5,bendModel:rStr('bendModel')||'bonded',supports:n('supports')??0,capA:n('capA'),capB:n('capB'),ovPct:n('ovPct')??10,bSat:n('bSat')??1.9,
     lvCond:c1,hvCond:c2,lvCondFixed:c1&&n('lvLayers')?c1:null,hvCondFixed:c2&&n('hvLayers')?c2:null};
   if(p.condBasis==='custom'&&!p.sigmaCustom) p.condBasis='standard';
   const manual=p.K&&p.B&&p.W&&p.lvLayers&&p.hvLayers&&c1&&c2&&p.lvDucts!=null&&p.hvDucts!=null;
@@ -108,7 +108,8 @@ function rModel(o,m){
     ['S.C. current, A (× rated)',f0(o.sc.windings[0].Isc)+' ('+g(o.sc.mult,1)+')',f0(o.sc.windings[1].Isc)],['S.C. current density, A/mm²',g(o.sc.windings[0].J,1),g(o.sc.windings[1].J,1)],
     ['S.C. temperature after '+o.sc.t+' s, °C (limit)',g(o.sc.windings[0].th1,0)+' ('+o.sc.windings[0].lim+')',g(o.sc.windings[1].th1,0)+' ('+o.sc.windings[1].lim+')'],
     ['S.C. radial force, kN',g(o.sc.windings[0].Fr/1000,1),g(o.sc.windings[1].Fr/1000,1)],['S.C. hoop stress, MPa (limit)',g(o.sc.windings[0].sigma,1)+' compr.',g(o.sc.windings[1].sigma,1)+' ('+o.sc.windings[1].stressLim+')'],
-    ['S.C. axial compression (est.), kN',g(o.sc.windings[0].Fa/1000,2),g(o.sc.windings[1].Fa/1000,2)]];
+    ['S.C. axial compression (est.), kN',g(o.sc.windings[0].Fa/1000,2),g(o.sc.windings[1].Fa/1000,2)],
+    ['S.C. bending, straight sides (est.), MPa',g(o.bend1,1)+' (span '+g(o.span,0)+')',g(o.bend2,1)]];
   const build=[['Core W × D (with limb plate)',o.W+' × '+o.D+' ('+o.cW+' × '+o.cD+') mm'],['Bobbin gap / δ / am',p.gap+' / '+p.delta+' / '+p.am+' mm'],
     ['Inner ID / OD (W × D)',g(o.ID1w,1)+' × '+g(o.ID1d,1)+' / '+g(o.OD1w,1)+' × '+g(o.OD1d,1)],['Outer ID / OD (W × D)',g(o.ID2w,1)+' × '+g(o.ID2d,1)+' / '+g(o.OD2w,1)+' × '+g(o.OD2d,1)],
     ['Centre distance / yoke length',g(o.Cd,1)+' / '+g(o.yokeL,1)+' mm'],['Window width × height',g(o.winW,1)+' × '+g(o.limb,2)+' mm'],['Corner radii R1–R4',o.R.map(x=>g(x,1)).join(' / ')+' mm'],
@@ -119,7 +120,7 @@ function rModel(o,m){
   const imp=[['h (mean wdg length)',g(o.h,2)+' mm'],['b (radial span)',g(o.bb,2)+' mm'],['k_r',g(o.kr,4)],['Ls',g(o.Ls,2)+' mm'],['δ′',g(o.dP,2)+' mm²'],
     ['Er',g(o.er,3)+' %'],['Ex',g(o.ex,3)+' %'],['Ek',g(o.ek,3)+' % (limits '+g(o.zLo,2)+'–'+g(o.zHi,2)+')']];
   const loss=[['Inner winding',g(o.LL1,1)+' W'],['Outer winding',g(o.LL2,1)+' W'],['Tank / stray (W/kVA × kVA)',g(o.tank,0)+' W'],['Total load loss',g(o.LL,1)+' W'],['Core loss',g(o.NLL,1)+' W'],
-    ['Total loss',g(o.LL+o.NLL,1)+' W'],['Efficiency 100 % / 50 %, pf 1',g(o.eff,2)+' / '+g(o.eff50,2)+' %'],['McLyman overall rise',g(o.mcly,1)+' K'],['Noise estimate',g(o.noise,1)+' dB(A)'],['Turns-ratio error (limit)',g(o.rerr,3)+' % ('+g(o.ratioLim,3)+' %)'],['Rise limit (altitude-derated)',g(o.riseLim,1)+' K'],...((p.capA||p.capB)?[['Total owning cost','₹ '+f0(o.toc)+' (price + '+f0(p.capA||0)+' ₹/kW × NLL + '+f0(p.capB||0)+' ₹/kW × LL)']]:[])];
+    ['Total loss',g(o.LL+o.NLL,1)+' W'],['Efficiency 100 % / 50 %, pf 1',g(o.eff,2)+' / '+g(o.eff50,2)+' %'],['McLyman overall rise',g(o.mcly,1)+' K'],['Noise estimate',g(o.noise,1)+' dB(A)'],['Turns-ratio error (limit)',g(o.rerr,3)+' % ('+g(o.ratioLim,3)+' %)'],['Rise limit (altitude-derated)',g(o.riseLim,1)+' K'],['Hot-spot (IEC 60076-12)',g(o.hs.tHS,0)+' °C (max '+o.hs.max+')'],['Insulation life at continuous rated load and '+p.amb+' °C',g(o.hs.lifeY,1)+' years (normal life at '+o.hs.rated+' °C hot-spot)'],...((p.capA||p.capB)?[['Total owning cost','₹ '+f0(o.toc)+' (price + '+f0(p.capA||0)+' ₹/kW × NLL + '+f0(p.capB||0)+' ₹/kW × LL)']]:[])];
   const mech=[['Active part L × B × H',o.aL+' × '+o.aB+' × '+o.aH+' mm'],['Overall L × B × H',o.oL+' × '+o.oB+' × '+o.oH+' mm'],['Core and winding mass',o.coreWdg+' kg'],['Total mass (without enclosure)',g(o.totMass-(o.bom.find(b=>b.k==='CRCA enclosure')||{q:0}).q,1)+' kg'],['Total mass',g(o.totMass,1)+' kg']];
   const bom=o.bom.map((b,i)=>[String(i+1),b.k,g(b.q,2),b.pr?String(b.pr):'—',b.amt?f0(b.amt):'—']);
   bom.push(['','Sub-total','','',f0(o.matCost)],['','Others @ '+p.price.others+' %','','',f0(o.others)],['','RM price','','',f0(o.cost)]);
@@ -205,6 +206,8 @@ function rSteps(o){
   S('Short-circuit current','I_sc = I × 100 ÷ (Z + Z_system), Z_system = '+g(s0.zs,3)+' %; peak factor k√2 = '+g(s0.kpk,3)+' at X/R '+g(s0.xr,2),f0(w0.Isc)+' / '+f0(w1.Isc)+' A (× '+g(s0.mult,1)+')');
   S('Short-circuit thermal (IEC 60076-5)','θ₁ = θ₀ + 2(θ₀ + k)/(C/(J²t) − 1), θ₀ = ambient + rise, t = '+s0.t+' s, C = '+(p.mat==='Cu'?'106000 (Cu)':'45700 (Al)'),g(w0.th1,0)+' / '+g(w1.th1,0)+' °C (limit '+w0.lim+')');
   S('Short-circuit forces','F_r = μ₀ (N I_pk)² × mean gap perimeter ÷ (2 Ls); hoop stress = F_r ÷ (2π N A)',g(w1.Fr/1000,1)+' kN, '+g(w1.sigma,1)+' MPa outer');
+  S('Hot-spot (IEC 60076-12)','θ_hs = ambient + 1.25 × average rise; life = a·e^(b/T) with Table 1 constants for class '+p.insClass,g(o.hs.tHS,0)+' °C, '+g(o.hs.lifeY,1)+' years at continuous rated load');
+  S('Straight-side bending (rectangular coil)','M = f × L² / 12 per straight side (fixed at the corners), f = F_r ÷ mean perimeter, L = '+g(o.span,0)+' mm; '+(p.bendModel==='loose'?'section of the individual turns':'resin-bonded block: section = winding length × radial depth² / 6'),g(o.bend1,1)+' / '+g(o.bend2,1)+' MPa');
   S('Noise estimate','L = A + 10 log₁₀(core kg) + slope × (B − 1.4); A = '+p.noiseA+' (calibrate from a measured unit)',g(o.noise,1)+' dB(A)');
   if(p.freq!==50) S('Frequency correction','core W/kg × (f/50)^1.5, VA × f/50','× '+g(STD.fLoss(p.freq),3));
   if((p.kFactor||1)>1) S('Harmonic loading','winding eddy loss × K = '+p.kFactor+', other stray × K^0.8','included in load loss');
@@ -231,7 +234,7 @@ function rRender(o,M){
   rSVG(o);
 }
 // Rectangular core: front view (all three limbs, to scale) and plan of one limb, fully dimensioned
-function rDrawing(o,print){ const P=drwPal(print), p=o.p; const W=o.W, L=o.limb, Cd=o.Cd, FW=o.yokeL, FH=L+2*W;
+function rDrawing(o,print,meta){ const P=drwPal(print), p=o.p; const W=o.W, L=o.limb, Cd=o.Cd, FW=o.yokeL, FH=L+2*W;
   const fs=Math.max(11,(FW+o.OD2w)/62), sw=fs*0.07; const over=(o.OD2w-W)/2;
   const x0=over+fs*6.2, y0=fs*8.2; const pX=x0+FW+fs*8.5+2*over, planW=o.OD2w, pcx=pX+planW/2, pcy=y0+FH/2;
   const SW=pX+planW+fs*4.5, SH=y0+FH+fs*9.5;
@@ -277,7 +280,7 @@ function rDrawing(o,print){ const P=drwPal(print), p=o.p; const W=o.W, L=o.limb,
   s+=sw_(P.core,P.coreEdge,'Core '+p.grade+', '+o.W+' × '+o.D+' mm');
   s+=sw_(P.lv,P.lvEdge,o.W1.role+' (inner): '+o.N1+' turns, '+o.L1+' layers'+(p.lvDucts?', '+p.lvDucts+' duct':''));
   s+=sw_(P.hv,P.hvEdge,o.W2.role+' (outer): '+o.N2+' turns, '+o.L2+' layers'+(p.hvDucts?', '+p.hvDucts+' duct':''));
-  return s+'</svg>'; }
+  s+='</svg>'; return (print&&meta)?addTitleBlock(s,titleMeta('rect',meta,o.p.kVA+' kVA, '+o.p.priV+' / '+o.p.secV+' V, '+o.p.vg+', core '+o.W+' × '+o.D)):s; }
 function rSVG(o){ $('#rSvg').innerHTML=rDrawing(o,false); }
 // tabs
 $$('#rTabs button').forEach(b=>b.addEventListener('click',()=>{ $$('#rTabs button').forEach(x=>x.setAttribute('aria-selected',x===b)); for(const t of ['sheet','comp','tests','steps']) $('#rtab-'+t).hidden=b.dataset.rtab!==t; }));
@@ -317,7 +320,7 @@ $('#reqFile').addEventListener('change',async e=>{
 function rfname(ext){ const p=RCUR.o.p, m=RCUR.meta; return designFileName(m.wo||m.party,'RECT',p.kVA,Math.max(p.priV,p.secV),Math.min(p.priV,p.secV),m.rev,ext); }
 $('#rPdf').addEventListener('click',async()=>{
   if(!RCUR) return; if($('#rInputCheck').classList.contains('err')){ toast('Fix the highlighted inputs first.'); return; } if(!window.jspdf){ toast('PDF library did not load. Reload the page.'); return; }
-  const png=await svgToPng(rDrawing(RCUR.o,true),2800);
+  const png=await svgToPng(rDrawing(RCUR.o,true,RCUR.meta),2800);
   const {jsPDF}=window.jspdf; const M=RCUR.M; const P=v=>v.map(r=>r.map(pdfText)); const ink=[23,33,43];
   const B=(fs)=>({theme:'grid',styles:{fontSize:fs,cellPadding:fs*0.1,lineColor:[150,160,170],lineWidth:0.15,textColor:ink},headStyles:{fillColor:[228,233,238],textColor:ink,fontStyle:'bold'},columnStyles:{0:{fontStyle:'bold'}}});
   const col=(h,i,map)=>{ if(h.section==='body'&&h.column.index===i) h.cell.styles.textColor=map(h.cell.raw); };
@@ -325,7 +328,7 @@ $('#rPdf').addEventListener('click',async()=>{
   const title=(d,t,y)=>{ d.setTextColor(...ink); d.setFont('helvetica','bold'); d.setFontSize(11); d.text(pdfText(t),8,y||12); };
   // page 1: title block + winding data (left) + core, impedance, losses, mechanical (right)
   const d=pdfFirstPage((fs)=>{ const d=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
-    d.setDrawColor(...ink); d.setLineWidth(0.5); d.rect(8,8,281,30); d.setFont('helvetica','bold'); d.setFontSize(11); d.setTextColor(...ink); d.text(pdfText(M.title.title),10,13);
+    d.setDrawColor(...ink); d.setLineWidth(0.5); d.rect(8,8,281,30); d.setFont('helvetica','bold'); d.setFontSize(11); d.setTextColor(...ink); d.text(pdfText(M.title.title),10,13); pdfBrand(d,222,9.5,64,7); pdfBrand(d,222,9.2,64,7.6);
     d.setFont('helvetica','normal'); d.setFontSize(6.2); M.title.cells.forEach((c,i)=>{ const x=10+(i%8)*35, y=18+Math.floor(i/8)*6.5; d.setTextColor(90); d.text(pdfText(c[0]),x,y); d.setTextColor(...ink); d.text(pdfText(c[1]).slice(0,34),x,y+2.7); });
     d.autoTable({...B(fs),startY:41,margin:{left:8,right:140,bottom:9},head:[P([['Parameter',M.wind[0][1],M.wind[0][2]]])[0]],body:P(M.wind.slice(1)),columnStyles:{0:{fontStyle:'bold',cellWidth:52}}});
     let y=41; const sec=(h,b)=>{ d.autoTable({...B(fs),startY:y,margin:{left:161,right:8,bottom:9},head:[[h,'']],body:P(b),columnStyles:{0:{fontStyle:'bold',cellWidth:48}}}); y=d.lastAutoTable.finalY+1; };

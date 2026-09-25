@@ -151,7 +151,8 @@ function rectDesign(p){
   chk('Impedance @'+T+' °C',p.zTarget+' % (+'+p.zTolPlus+' / −'+p.zTolMinus+' %) → '+rnd(zLo,2)+'–'+rnd(zHi,2)+' %',rnd(ek,2)+' %',ek>=zLo-1e-9&&ek<=zHi+1e-9);
   chk('Efficiency @'+T+' °C, 100 % load','> '+p.effMin+' %',rnd(eff,2)+' %',eff>p.effMin);
   chk('Winding temperature rise (inner / outer)','≤ '+rnd(riseLim,1)+' K at '+p.amb+' °C ambient'+(riseLim<p.riseLimit?' (altitude '+p.altitude+' m)':''),rnd(rise1,1)+' / '+rnd(rise2,1)+' K',Math.max(rise1,rise2)<=riseLim);
-  chk('Hot-spot vs insulation class',p.insClass+' ('+hsMax+' °C)',rnd(p.amb+Math.max(rise1,rise2)*1.1,0)+' °C est.',p.amb+Math.max(rise1,rise2)*1.1<=hsMax);
+  const hs=STD.hotSpot(p.insClass,p.amb,Math.max(rise1,rise2)); o.hs=hs;
+  chk('Hot-spot temperature (IEC 60076-12)','≤ '+hs.max+' °C (class '+p.insClass+', Table 2)',rnd(hs.tHS,0)+' °C = '+p.amb+' + 1.25 × '+rnd(Math.max(rise1,rise2),1)+' K',hs.ok);
   chk('Turns-ratio error (IEC 60076-1)','≤ '+rnd(o.ratioLim,3)+' % (lower of 0.5 % and Z/10)',rnd(rerr,3)+' %',Math.abs(rerr)<=o.ratioLim+1e-9);
   chk('Flux density','≤ 1.55 T for low noise',rnd(Bact,3)+' T',Bact<=1.55);
   { const ov=STD.overflux(Bact,p.ovPct??10,p.bSat||1.9); o.overflux=ov; chk('Flux at '+(p.ovPct??10)+' % over-voltage','≤ '+(p.bSat||1.9)+' T',rnd(ov.Bov,3)+' T',ov.ok); }
@@ -160,9 +161,18 @@ function rectDesign(p){
   chk('Current density inner / outer',p.mat==='Al'?'≤ 1.8 A/mm² (Al)':'≤ 3.0 A/mm² (Cu)',rnd(o.J1,3)+' / '+rnd(o.J2,3),Math.max(o.J1,o.J2)<=(p.mat==='Al'?1.8:3.0));
   chk('Inter-layer insulation inner / outer','≥ '+rnd(ilReq1,3)+' / '+rnd(ilReq2,3)+' mm',p.lvIL+' / '+p.hvIL+' mm',p.lvIL>=ilReq1-1e-9&&p.hvIL>=ilReq2-1e-9);
   for(const w of sc.windings){ chk('Short-circuit thermal, '+w.name,'≤ '+w.lim+' °C after '+sc.t+' s (IEC 60076-5)',rnd(w.th1,0)+' °C',w.thermalOk); }
+  // Rectangular coils: under short circuit the straight sides bend between corners/supports like a beam fixed at both ends.
+  // Resin-bonded (VPI / cast) windings act as one block; loose windings bend turn by turn. Estimate: M = f·L²/12.
+  const span=Math.max(cW,cD)/((p.supports||0)+1); o.span=span;
+  const bend=(w,C,N,len,rad)=>{ const f=w.Fr/(mg/1000)/1000; /* N per mm of mean perimeter */ const M=f*span*span/12;
+    return p.bendModel==='loose'? M/(N*C.rad*C.ax)/(C.b*C.h*C.h/6) : M/(len*rad*rad/6); };
+  o.bend1=bend(sc.windings[0],C1,N1,len1,rad1); o.bend2=bend(sc.windings[1],C2,N2,len2,rad2);
   const wo=sc.windings[1]; chk('Short-circuit hoop stress, outer (tensile)','≤ '+wo.stressLim+' MPa (0.9 × Rp0.2)',rnd(wo.sigma,1)+' MPa',wo.stressOk);
   const wi=sc.windings[0]; const cLim=STD.compLimit(wi.stressLim,p.bonded); const sEq=wi.sigma*(L1>=3?1.1:1); o.compLim=cLim; o.compEq=sEq;
   chk('Short-circuit hoop stress, inner (compressive)','≤ '+rnd(cLim,1)+' MPa ('+(p.bonded?'0.6':'0.35')+' × Rp0.2, IS 2026-5 Annex A)',rnd(sEq,1)+' MPa'+(L1>=3?' (1.1 × mean)':''),sEq<=cLim);
+  const lim=wo.stressLim; const tot2=wo.sigma+o.bend2, tot1=Math.abs(sc.windings[0].sigma)+o.bend1;
+  chk('Short-circuit bending of straight sides, outer (estimate)','hoop + bending ≤ '+lim+' MPa; span '+rnd(span,0)+' mm, '+(p.bendModel==='loose'?'loose turns':'resin-bonded'),rnd(wo.sigma,1)+' + '+rnd(o.bend2,1)+' = '+rnd(tot2,1)+' MPa',tot2<=lim);
+  chk('Short-circuit bending of straight sides, inner (estimate)','hoop + bending ≤ '+lim+' MPa',rnd(Math.abs(sc.windings[0].sigma),1)+' + '+rnd(o.bend1,1)+' = '+rnd(tot1,1)+' MPa',tot1<=lim);
   const zMin=STD.zMin(p.kVA); o.zMin=zMin;
   if(ek<zMin) o.warn.push('Impedance '+rnd(ek,2)+' % is below the IEC 60076-5 recognised minimum of '+zMin+' % for this rating: short-circuit withstand is subject to agreement with the purchaser'+(sc.mult>25?'; with the fault current above 25 × rated, a duration below 2 s may also be agreed (IEC 60076-5 4.1.3)':'')+'.');
   for(const c of o.checks) if(!c.ok) o.warn.push(c.name+': required '+c.req+', obtained '+c.got+'.');
@@ -268,5 +278,5 @@ const RC_DEFAULTS={kVA:70,freq:50,priV:433,priConn:'D',secV:400,secConn:'Y',vg:'
   lvLayers:4,hvLayers:4,lvCond:{type:'strip',b:10.5,h:3.5,rad:1,ax:2},hvCond:{type:'strip',b:10.5,h:3.5,rad:1,ax:1},lvIns:0.11,hvIns:0.11,lvIL:0.13,hvIL:0.13,
   extraTurn:1,roundLen:false,lvDucts:0,hvDucts:0,lvDuctW:8,hvDuctW:8,lvAxDucts:0,hvAxDucts:0,lvTransp:0,hvTransp:0,lvComp:0,hvComp:0,bulge:1.1,
   tankWkVA:1.5,coreFactor:1.32,buildF:1.5,leads:0,clrL:250,clrB:260,clrTop:250,clrBot:75,enclosure:false,enclThk:2,
-  altitude:1000,faultMVA:null,scTime:2,scRequired:false,ovPct:10,bSat:1.9,capA:null,capB:null,llTarget:null,llTol:5,stressCu:80,stressAl:35,bonded:false,kFactor:1,riseCal1:1,riseCal2:1,noiseA:22,noiseB:35,Eb:10000,
+  altitude:1000,faultMVA:null,scTime:2,scRequired:false,ovPct:10,bSat:1.9,capA:null,capB:null,llTarget:null,llTol:5,stressCu:80,stressAl:35,bonded:false,bendModel:'bonded',supports:0,kFactor:1,riseCal1:1,riseCal2:1,noiseA:22,noiseB:35,Eb:10000,
   price:{core:270,coreSteel:200,cond:440,leads:440,fg:500,connFg:500,clh:5950,resin:650,crca:90,others:15},wCost:1,wLoss:0.5};

@@ -53,7 +53,7 @@ const RECT_RULES=[
   NONNEG('tankWkVA','Stray/tank loss','W/kVA',{max:30}), POS('coreFactor','Core loss factor','',{max:5}), {n:'buildF',l:'Core building factor',min:1,max:3},
   NONNEG('clrL','Overall clearance L','mm'), NONNEG('clrB','Overall clearance B','mm'), POS('sigmaCustom','Conductivity','m/Ω·mm²',{max:70}),
   {n:'riseCal1',l:'Inner rise calibration',min:0.3,max:3}, {n:'riseCal2',l:'Outer rise calibration',min:0.3,max:3}, POS('stressCu','Copper stress limit','MPa',{max:500}), POS('stressAl','Aluminium stress limit','MPa',{max:500}),
-  {n:'extraTurn',l:'Extra turn per layer',min:0,max:3},
+  {n:'extraTurn',l:'Extra turn per layer',min:0,max:3}, WHOLE('supports','Supports per straight side',0,20),
   POS('llTarget','Load loss target','W'), {n:'llTol',l:'Target tolerance',min:0,max:50,u:'%'}, NONNEG('capA','No-load capitalisation','₹/kW'), NONNEG('capB','Load capitalisation','₹/kW'), {n:'ovPct',l:'Over-voltage for flux check',min:0,max:30,u:'%'}, {n:'bSat',l:'Flux limit at over-voltage',min:1.5,max:2.1,u:'T'},
   NONNEG('pCore','Core price','₹/kg'), NONNEG('pCond','Conductor price','₹/kg'), NONNEG('pSteel','Steel price','₹/kg'), NONNEG('pFg','FG price','₹/kg'), NONNEG('pClh','Class H price','₹/kg'), NONNEG('pResin','Resin price','₹/kg'), {n:'pOthers',l:'Others',min:0,max:100,u:'%'}];
 function rectCross(val,bad,warns,formEl){
@@ -123,7 +123,7 @@ function gtpRows(g){ const f=(x,n)=>x==null||isNaN(x)?'—':Number(x).toFixed(n)
   if(g.toc!=null) add('Total owning cost (price + capitalised losses)','₹',Math.round(g.toc).toLocaleString('en-IN'));
   add('Standards','—',g.std); return R; }
 function gtpPdf(g,meta,file){ if(!window.jspdf){ toast('PDF library did not load.'); return; } const {jsPDF}=window.jspdf; const d=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'}); const ink=[23,33,43];
-  d.setDrawColor(...ink); d.setLineWidth(0.5); d.rect(10,10,190,22); d.setFont('helvetica','bold'); d.setFontSize(12); d.setTextColor(...ink); d.text('Guaranteed Technical Particulars',12,17);
+  d.setDrawColor(...ink); d.setLineWidth(0.5); d.rect(10,10,190,22); d.setFont('helvetica','bold'); d.setFontSize(12); d.setTextColor(...ink); d.text('Guaranteed Technical Particulars',12,17); if(typeof pdfBrand==='function') pdfBrand(d,120,11.5,78,8); if(typeof pdfBrand==='function') pdfBrand(d,138,11.2,60,8);
   d.setFont('helvetica','normal'); d.setFontSize(8); const cells=[['Party',meta.party||'—'],['Work order',meta.wo||'—'],['Revision',meta.rev||'R0'],['Date',new Date().toLocaleDateString('en-GB')],['Rating',g.kVA+' kVA, '+g.w2.V+' / '+g.w1.V+' V'],['Tool',APP_VERSION]];
   cells.forEach((c,i)=>{ const x=12+(i%3)*63, y=23+Math.floor(i/3)*5; d.setTextColor(90); d.text(pdfText(c[0])+':',x,y); d.setTextColor(...ink); d.text(pdfText(c[1]).slice(0,34),x+17,y); });
   d.autoTable({theme:'grid',startY:36,margin:{left:10,right:10,bottom:14},styles:{fontSize:7.6,cellPadding:1.1,lineColor:[150,160,170],lineWidth:0.15,textColor:ink},headStyles:{fillColor:[228,233,238],textColor:ink,fontStyle:'bold'},

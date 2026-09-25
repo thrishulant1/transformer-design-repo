@@ -44,3 +44,22 @@ function pdfDrawingPage(d,png,title,notes){ d.addPage(); d.setTextColor(23,33,43
   const x0=8,y0=16,W=281,H=(notes&&notes.length?170:182); if(png){ const k=Math.min(W/png.w,H/png.h); const w=png.w*k, h=png.h*k; d.addImage(png.url,'PNG',x0+(W-w)/2,y0,w,h); }
   else { d.setFont('helvetica','normal'); d.setFontSize(9); d.text('The drawing could not be rendered in this browser.',x0,y0+10); }
   if(notes&&notes.length){ d.setFont('helvetica','normal'); d.setFontSize(7); d.setTextColor(86,97,108); notes.forEach((t,i)=>d.text(pdfText(t),x0,y0+H+5+i*3.6)); } }
+
+// ISO 7200-style title block appended below a print drawing (used on the PDF drawing page and in the DXF).
+// meta: {title, desc, dwg, rev, by, chk, appr, date, company, tool}
+function addTitleBlock(svg,meta){ const m=svg.match(/viewBox="0 0 ([\d.]+) ([\d.]+)"/); if(!m) return svg; const W=+m[1], H=+m[2];
+  const fs=Math.max(10,W/80), ink='#17212B', sub='#56616C', rowH=fs*2.1, bw=Math.min(W-fs*2,fs*56), x0=W-bw-fs*0.8, y0=H+fs*0.8, sw=fs*0.07;
+  const cols=[0.42,0.2,0.2,0.18].map(f=>f*bw); const cx=[x0,x0+cols[0],x0+cols[0]+cols[1],x0+cols[0]+cols[1]+cols[2]];
+  const esc=s=>String(s==null||s===''?'—':s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  const cell=(ci,span,row,label,val,big)=>{ const x=cx[ci], w=cols.slice(ci,ci+span).reduce((a,b)=>a+b,0), y=y0+row*rowH;
+    return '<rect x="'+DRW.n(x)+'" y="'+DRW.n(y)+'" width="'+DRW.n(w)+'" height="'+DRW.n(rowH)+'" fill="none" stroke="'+ink+'" stroke-width="'+DRW.n(sw)+'"/>'+
+      '<text x="'+DRW.n(x+fs*0.3)+'" y="'+DRW.n(y+fs*0.72)+'" font-size="'+DRW.n(fs*0.55)+'" fill="'+sub+'">'+esc(label)+'</text>'+
+      '<text x="'+DRW.n(x+fs*0.3)+'" y="'+DRW.n(y+rowH-fs*0.45)+'" font-size="'+DRW.n(fs*(big?0.95:0.78))+'" fill="'+ink+'"'+(big?' font-weight="600"':'')+'>'+esc(val)+'</text>'; };
+  let b='<rect x="'+DRW.n(x0)+'" y="'+DRW.n(y0)+'" width="'+DRW.n(bw)+'" height="'+DRW.n(rowH*4)+'" fill="none" stroke="'+ink+'" stroke-width="'+DRW.n(sw*2.2)+'"/>';
+  b+=cell(0,2,0,'Title',meta.title,true)+cell(2,1,0,'Drawing no.',meta.dwg)+cell(3,1,0,'Revision',meta.rev||'R0');
+  b+=cell(0,2,1,'Description',meta.desc)+cell(2,1,1,'Scale','Scaled to fit; DXF 1:1')+cell(3,1,1,'Units','mm');
+  b+=cell(0,1,2,'Designed',meta.by)+cell(1,1,2,'Checked',meta.chk)+cell(2,1,2,'Approved',meta.appr)+cell(3,1,2,'Date',meta.date);
+  b+=cell(0,2,3,'Company',meta.company)+cell(2,1,3,'Sheet','1 of 1')+cell(3,1,3,'Tool',meta.tool);
+  const H2=y0+rowH*4+fs*0.8; return svg.replace(/viewBox="0 0 [\d.]+ [\d.]+"/,'viewBox="0 0 '+W+' '+DRW.n(H2)+'"').replace(/ height="[\d.]+"/,' height="'+DRW.n(H2)+'"').replace(/<\/svg>\s*$/,b+'</svg>'); }
+function titleMeta(kind,m,desc){ const c=(typeof companyGet==='function')?companyGet():{}; return {title:'General arrangement, '+(kind==='rect'?'rectangular core':'round core'),desc,dwg:m.dwg,rev:m.rev,by:m.by,chk:m.chk,appr:m.appr,
+  date:new Date().toLocaleDateString('en-GB'),company:c.name||'',tool:APP_VERSION.split(' ')[0]}; }

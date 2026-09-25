@@ -220,6 +220,7 @@ function design(p){
   if(p.zTarget){ const tol=STD.zTol(p.zTarget); chk('Impedance','target '+p.zTarget+' % ± '+tol+' %',r1(ek,2)+' %',Math.abs(ek-p.zTarget)/p.zTarget*100<=tol); }
   chk('Turns-ratio error (IEC 60076-1)','≤ '+r1(ratioLim,3)+' %',r1(rerr,3)+' %',Math.abs(rerr)<=ratioLim+1e-9);
   chk('LV / HV winding rise','≤ '+r1(riseLim,1)+' K (class '+p.insClass+(riseLim<out.rise?', altitude '+p.altitude+' m':'')+')',r1(lvGrad,1)+' / '+r1(hvGrad,1)+' K',Math.max(lvGrad,hvGrad)<=riseLim);
+  { const hs=STD.hotSpot(p.insClass,p.amb??40,Math.max(lvGrad,hvGrad)); out.hs=hs; chk('Hot-spot temperature (IEC 60076-12)','≤ '+hs.max+' °C (class '+p.insClass+', Table 2)',r1(hs.tHS,0)+' °C = '+(p.amb??40)+' + 1.25 × '+r1(Math.max(lvGrad,hvGrad),1)+' K',hs.ok); }
   chk('Flux density','≤ 1.70 T',r1(Bact,3)+' T',Bact<=1.70);
   { const ov=STD.overflux(Bact,p.ovPct??10,p.bSat||1.9); out.overflux=ov; chk('Flux at '+(p.ovPct??10)+' % over-voltage','≤ '+(p.bSat||1.9)+' T',r1(ov.Bov,3)+' T',ov.ok); }
   if(p.llTarget){ const tol=p.llTol??5; const dev=(LLtot-p.llTarget)/p.llTarget*100; out.llDev=dev; chk('Load loss target','≤ '+p.llTarget+' W (tolerance −'+tol+' %)',Math.round(LLtot)+' W ('+(dev>=0?'+':'')+r1(dev,1)+' %)',dev<=0.0001&&dev>=-tol); }
