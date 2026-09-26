@@ -59,6 +59,15 @@ console.log('\nv1.5 features (IEC 60076-12 hot-spot, straight-side bending)');
   near('Normal life at rated hot-spot 170 °C = 180 000 h',X.STD.hotSpot('H',0,170/1.25).lifeH,180000,1500); near('Class F rated hot-spot life 145 °C',X.STD.hotSpot('F',0,145/1.25).lifeH,180000,1500); }
 { const q=X.rectDesign({...X.RC_DEFAULTS,roundLen:true,supports:1}); const b=q.checks.filter(c=>/bending/.test(c.name));
   is('Straight-side bending passes with one support per side',b.length===2&&b.every(c=>c.ok)); near('Outer bending, resin-bonded, 83 mm span',q.bend2,7.94,0.05); }
+console.log('\nv1.6 features (single-phase, taps, harmonics, tender calculations)');
+{ const h=X.STD.harmonics(X.STD.parseSpectrum('5:25, 7:14, 11:6, 13:4')); near('K-factor of 30 % THDi inverter spectrum',h.K,3.89,0.01); near('THDi',h.thd*100,29.5,0.1);
+  const h3=X.STD.harmonics(X.STD.parseSpectrum('3:30, 5:20')); near('Neutral current with 30 % third harmonic (× phase rms)',h3.neutral,0.847,0.002); }
+near('Overload: 100 K at 110 % load → 116.5 K (load^1.6)',X.STD.overloadRise(100,10),116.5,0.1);
+near('70 kVA secondary fault current (kA)',r.fault.Isc/1000,3.466,0.01);
+{ const p1={...X.RC_DEFAULTS,basis:'refined',condBasis:'standard',phases:1,kVA:4,priV:690,secV:230,mat:'Cu',insClass:'F',grade:'CRNO-35',priTaps:[600,630,660],secTaps:[100,115,175],
+    zTarget:5,zTolPlus:10,zTolMinus:10,effMin:95,riseLimit:85,amb:50,windTemp:120,noiseMax:60,K:null,W:60,D:93,B:null,lvLayers:null,hvLayers:null,lvDucts:null,hvDucts:null,clrL:0,clrB:0,price:{...X.RC_DEFAULTS.price,cond:900,leads:900}};
+  const a=X.rectAuto(p1); is('Single-phase 4 kVA designs (2 limbs)',a&&a.nl===2&&a.ph===1);
+  near('4 kVA load loss vs company GTP 120 W',a.LL,120,15); near('4 kVA no-load loss vs company GTP 70 W',a.NLL,70,15); is('4 kVA secondary tap table has 4 taps',a.taps1.length===4&&a.taps1[3].V===100); }
 console.log('\nStandards helpers');
 near('IEC ratio limit at Z = 2.91 %',X.STD.ratioLimit(2.91),0.291,1e-9); near('Altitude factor 2000 m',X.STD.altitudeFactor(2000),0.95,1e-9);
 near('Al σ @115 °C (61 % IACS)',X.STD.sigmaStd('Al',115),25.49,0.01); near('SC temp Al θ0=164.5 J=47.9 t=2',X.STD.scTemp('Al',164.5,47.9,2),251,1);

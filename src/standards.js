@@ -1,5 +1,5 @@
 // ===== Shared standards helpers (used by both engines) =====
-const APP_VERSION='1.5.0 (25 Sep 2026)';
+const APP_VERSION='1.6.0 (26 Sep 2026)';
 const STD={};
 // Resistivity at 20 °C (Ω·mm²/m) and temperature constant: Cu 100 % IACS, EC aluminium 61 % IACS
 STD.RHO={Cu:{r20:0.017241,k:234.5},Al:{r20:0.028264,k:225}};
@@ -73,3 +73,30 @@ STD.HS={A:{a:3.10e-14,b:15900,rated:95,max:130},E:{a:5.48e-15,b:17212,rated:110,
   F:{a:9.60e-17,b:20475,rated:145,max:180},H:{a:5.35e-18,b:22979,rated:170,max:205}};
 STD.hotSpot=(cls,amb,riseAvg,Z)=>{ const h=STD.HS[cls]||STD.HS.H, z=Z||1.25; const dHS=z*riseAvg, tHS=amb+dHS; const life=h.a*Math.exp(h.b/(273+tHS));
   return {Z:z,dHS,tHS,max:h.max,rated:h.rated,ok:tHS<=h.max,lifeH:life,lifeY:life/8760,ageing:180000/life}; };
+
+// ---------- Harmonics (IEEE C57.110): spectrum "5:25, 7:14, 11:6" = harmonic order : % of fundamental ----------
+STD.parseSpectrum=(txt)=>{ if(!txt||!String(txt).trim()) return null; const out=[[1,1]];
+  for(const part of String(txt).split(/[,;\s]+/)){ const m=part.match(/^(\d+)\s*[:=]\s*([\d.]+)%?$/); if(!m) continue; const h=+m[1], v=+m[2]/100; if(h>1&&h<=100&&v>=0) out.push([h,v]); }
+  return out.length>1?out:null; };
+STD.harmonics=(spec)=>{ const s2=spec.reduce((a,[h,i])=>a+i*i,0); const K=spec.reduce((a,[h,i])=>a+i*i*h*h,0)/s2;
+  const thd=Math.sqrt(Math.max(0,s2-1)); const trip=spec.filter(([h])=>h%3===0&&h>1).reduce((a,[h,i])=>a+i*i,0);
+  // neutral of a 4-wire star winding carries 3 × each triplen harmonic of the phase current
+  const neutral=3*Math.sqrt(trip)/Math.sqrt(s2); const rms=Math.sqrt(s2); return {K,thd,rms,neutral}; };
+// ---------- Continuous overload (IEC 60076-12, AN cooling): rise ∝ (load)^1.6 ----------
+STD.overloadRise=(rise,ovPct)=>rise*Math.pow(1+(ovPct||0)/100,1.6);
+// ---------- Tender calculations ----------
+// Secondary fault current (kA, symmetrical) and peak, from impedance (+ system impedance)
+STD.faultLevel=(I2,ek,zsys,kpk)=>{ const Isc=I2*100/(ek+(zsys||0)); return {Isc,peak:Isc*(kpk||1.8*Math.SQRT2)}; };
+// Inrush estimate (air-core method): after saturation the excess flux (2·Bm + Br − Bs)·A_core is carried by the air-core field of the
+// energised winding: I_pk = ΔB·A_core·L_w / (μ0·N·A_w). Br ≈ 0.8·Bm, Bs = 2.03 T (CRGO). Decay time constant τ = L_air / R.
+STD.inrush=({Bm,Acore_m2,Aw_m2,Lw_m,N,R,Irated,f,Bs,Br})=>{ const mu0=4*Math.PI*1e-7; const bs=Bs||2.03, br=Br??0.8*Bm; const dB=Math.max(0,2*Bm+br-bs);
+  const Ipk=dB*Acore_m2*Lw_m/(mu0*N*Aw_m2); const L=mu0*N*N*Aw_m2/Lw_m; const tau=R>0?L/R:null;
+  return {Ipk,times:Ipk/(Math.SQRT2*Irated),tau,dB}; };
+// Busbar sizing: current (with margin) ÷ current density, rounded up to the next standard flat size
+STD.BUSBARS=[[15,3],[20,3],[20,5],[25,3],[25,5],[30,5],[40,5],[50,5],[40,10],[50,10],[60,10],[80,10],[100,10]];
+STD.busbar=(I,mat,margin)=>{ const J=mat==='Cu'?1.6:1.0, need=I*(margin||1.25)/J; const s=STD.BUSBARS.find(([w,t])=>w*t>=need)||STD.BUSBARS[STD.BUSBARS.length-1];
+  return {need,size:s[0]+' × '+s[1],J}; };
+// Cutting list for a single-phase core with two limbs (45° mitred corners): limbs (2) long = H + 2W, short = H; yokes (2) long = C + W, short = C − W
+STD.cutList1ph=(W,D,H,C,sf,dens)=>{ const rho=(dens||7.65)*1e-6, k=sf||0.97; const rows=[]; let total=0;
+  const add=(grp,qty,short,long)=>{ const kg=W*D*qty*(short+long)/2*rho*k; total+=kg; rows.push({grp,step:1,w:W,stack:D,qty,short,long,kg}); };
+  add('Limbs',2,H,H+2*W); add('Yokes',2,C-W,C+W); return {rows,total,type:'single-phase, 2 limbs, 45° mitred'}; };

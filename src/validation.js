@@ -53,7 +53,7 @@ const RECT_RULES=[
   NONNEG('tankWkVA','Stray/tank loss','W/kVA',{max:30}), POS('coreFactor','Core loss factor','',{max:5}), {n:'buildF',l:'Core building factor',min:1,max:3},
   NONNEG('clrL','Overall clearance L','mm'), NONNEG('clrB','Overall clearance B','mm'), POS('sigmaCustom','Conductivity','m/Ω·mm²',{max:70}),
   {n:'riseCal1',l:'Inner rise calibration',min:0.3,max:3}, {n:'riseCal2',l:'Outer rise calibration',min:0.3,max:3}, POS('stressCu','Copper stress limit','MPa',{max:500}), POS('stressAl','Aluminium stress limit','MPa',{max:500}),
-  {n:'extraTurn',l:'Extra turn per layer',min:0,max:3}, WHOLE('supports','Supports per straight side',0,20),
+  {n:'extraTurn',l:'Extra turn per layer',min:0,max:3}, {n:'overload',l:'Continuous overload',min:0,max:60,u:'%'}, POS('maxL','Maximum length','mm'), POS('maxB','Maximum breadth','mm'), POS('maxH','Maximum height','mm'), WHOLE('supports','Supports per straight side',0,20),
   POS('llTarget','Load loss target','W'), {n:'llTol',l:'Target tolerance',min:0,max:50,u:'%'}, NONNEG('capA','No-load capitalisation','₹/kW'), NONNEG('capB','Load capitalisation','₹/kW'), {n:'ovPct',l:'Over-voltage for flux check',min:0,max:30,u:'%'}, {n:'bSat',l:'Flux limit at over-voltage',min:1.5,max:2.1,u:'T'},
   NONNEG('pCore','Core price','₹/kg'), NONNEG('pCond','Conductor price','₹/kg'), NONNEG('pSteel','Steel price','₹/kg'), NONNEG('pFg','FG price','₹/kg'), NONNEG('pClh','Class H price','₹/kg'), NONNEG('pResin','Resin price','₹/kg'), {n:'pOthers',l:'Others',min:0,max:100,u:'%'}];
 function rectCross(val,bad,warns,formEl){
@@ -68,6 +68,9 @@ function rectCross(val,bad,warns,formEl){
   const mat=formEl.elements.mat.value, lim=mat==='Al'?1.8:3.0; for(const [n,t] of [['J1','Inner'],['J2','Outer']]){ const j=val(n); if(j&&j>lim) warns.push(t+' current density target '+j+' A/mm² is high for '+(mat==='Al'?'aluminium':'copper')+'.'); }
   const B=val('B'),W=val('W'),D=val('D'); if(W&&D&&(D/W<0.8||D/W>3.5)) warns.push('Core build D / width W = '+(D/W).toFixed(2)+' is unusual (typical 1.2–2.6).');
   if(val('zTolMinus')!=null&&val('zTolMinus')>=100) bad('zTolMinus','Impedance tolerance (−) must be below 100 %.');
+  { const t=(formEl.elements.harmonics||{}).value; if(t&&t.trim()&&!STD.parseSpectrum(t)) bad('harmonics','Harmonic spectrum not understood. Use order:percent pairs, for example 5:25, 7:14, 11:6.'); }
+  for(const [n,l] of [['priTaps','Primary taps'],['secTaps','Secondary taps']]){ const t=(formEl.elements[n]||{}).value||''; if(t.trim()&&!/^\s*\d+(\.\d+)?(\s*[,;\s]\s*\d+(\.\d+)?)*\s*$/.test(t)) bad(n,l+': enter voltages separated by commas, for example 600, 630, 660.'); }
+  if(formEl.elements.phases&&formEl.elements.phases.value==='1'&&formEl.elements.vg.value!=='Ii0') warns.push('Single-phase selected: the vector group is set to Ii0 automatically.');
 }
 
 // ---------- Round core (HV/LV) ----------
@@ -85,8 +88,10 @@ const ROUND_RULES=[
   NONNEG('hvMinIns','HV inter-layer minimum','mm',{max:5}), NONNEG('lvIns','LV conductor insulation','mm',{max:5}), NONNEG('hvInsRound','HV round insulation','mm',{max:5}), NONNEG('hvInsStrip','HV strip insulation','mm',{max:5}),
   NONNEG('enclClr','Enclosure clearance','mm',{max:2000}), {n:'riseCal1',l:'LV rise calibration',min:0.3,max:3}, {n:'riseCal2',l:'HV rise calibration',min:0.3,max:3},
   NONNEG('pCore','Core price','₹/kg'), NONNEG('pCu','Copper price','₹/kg'), NONNEG('pAl','Aluminium price','₹/kg'),
-  POS('llTarget','Load loss target','W'), {n:'llTol',l:'Target tolerance',min:0,max:50,u:'%'}, NONNEG('leadLoss','Lead loss','W'), NONNEG('capA','No-load capitalisation','₹/kW'), NONNEG('capB','Load capitalisation','₹/kW'), {n:'ovPct',l:'Over-voltage for flux check',min:0,max:30,u:'%'}, {n:'bSat',l:'Flux limit at over-voltage',min:1.5,max:2.1,u:'T'}];
-function roundCross(val,bad,warns){
+  {n:'overload',l:'Continuous overload',min:0,max:60,u:'%'}, POS('maxL','Maximum length','mm'), POS('maxB','Maximum breadth','mm'), POS('maxH','Maximum height','mm'), POS('llTarget','Load loss target','W'), {n:'llTol',l:'Target tolerance',min:0,max:50,u:'%'}, NONNEG('leadLoss','Lead loss','W'), NONNEG('capA','No-load capitalisation','₹/kW'), NONNEG('capB','Load capitalisation','₹/kW'), {n:'ovPct',l:'Over-voltage for flux check',min:0,max:30,u:'%'}, {n:'bSat',l:'Flux limit at over-voltage',min:1.5,max:2.1,u:'T'}];
+function roundCross(val,bad,warns){ const formEl=document.getElementById('f');
+  { const t=(formEl.elements.harmonics||{}).value; if(t&&t.trim()&&!STD.parseSpectrum(t)) bad('harmonics','Harmonic spectrum not understood. Use order:percent pairs, for example 5:25, 7:14, 11:6.'); }
+
   const hv=val('hvV'), lv=val('lvV'); if(hv&&lv&&hv<=lv) bad('hvV','HV voltage ('+hv+' V) must be higher than LV voltage ('+lv+' V). For LV/LV units use the rectangular-core module.');
   const tp=val('tapPlus')||0, tm=val('tapMinus')||0, ts=val('tapStep'); if(ts&&(tp||tm)&&Math.abs((tp+tm)/ts-Math.round((tp+tm)/ts))>1e-6) warns.push('The tap range '+tp+' % / −'+tm+' % is not a whole number of '+ts+' % steps.');
   if(!ts&&(tp||tm)) warns.push('Tap range is set but the tap step is 0, so no taps are calculated.');
@@ -106,32 +111,49 @@ function autoAsync(kind,p){ const run=()=>kind==='round'?designAuto(p):rectAuto(
     w.addEventListener('message',h); try{ w.postMessage({id,kind,p}); }catch(e){ done=true; clearTimeout(to); w.removeEventListener('message',h); AUTO_WORKER_OK=false; try{ resolve(run()); }catch(e2){ reject(e2); } } }); }
 
 // ================= Shared outputs: GTP, alternatives, cutting list =================
-// g: normalised design summary built by each module (see rGtpData / roundGtpData)
-function gtpRows(g){ const f=(x,n)=>x==null||isNaN(x)?'—':Number(x).toFixed(n); const R=[]; let i=0; const add=(t,u,v)=>R.push([String(++i),t,u,v]);
-  add('Rating','kVA',String(g.kVA)); add('Phases / frequency','—','3 / '+g.freq+' Hz'); add('Type','—',g.type);
-  add('Rated voltage, '+g.w1.name,'V',g.w1.V+' ('+g.w1.conn+')'); add('Rated voltage, '+g.w2.name,'V',g.w2.V+' ('+g.w2.conn+')'); add('Rated current, '+g.w1.name+' / '+g.w2.name,'A',f(g.w1.I,2)+' / '+f(g.w2.I,2));
-  add('Vector group','—',g.vg); add('Cooling','—',g.cooling); add('Insulation class / temperature rise','—',g.insClass+' / '+f(g.riseLim,0)+' K');
-  add('Tapping','—',g.taps); add('Tap changer','—',g.tapChanger);
-  add('No-load loss','W',f(g.NLL,0)); add('Load loss at '+g.T+' °C, principal tap','W',f(g.LL,0)+(g.lead?' (incl. '+f(g.lead,0)+' W leads)':'')); add('Total loss at 100 % / 50 % load','W',f(g.NLL+g.LL,0)+' / '+f(g.NLL+0.25*g.LL,0));
-  add('Impedance at '+g.T+' °C','%',f(g.Z,2)); add('Resistance / reactance voltage','%',f(g.er,3)+' / '+f(g.ex,3)); add('No-load current','%',f(g.I0,2));
-  for(const pf of [1,0.8]) add('Efficiency at pf '+pf+': 100 / 75 / 50 % load','%',[1,0.75,0.5].map(x=>f(STD.effAt(g.kVA,g.NLL,g.LL,x,pf),2)).join(' / '));
-  add('Regulation at full load, pf 1 / pf 0.8','%',f(STD.reg(g.er,g.ex,1),2)+' / '+f(STD.reg(g.er,g.ex,0.8),2));
-  add('Temperature rise, '+g.w1.name+' / '+g.w2.name,'K',f(g.rise1,1)+' / '+f(g.rise2,1)); add('Maximum flux density at rated voltage','T',f(g.B,3));
-  add('Current density, '+g.w1.name+' / '+g.w2.name,'A/mm²',f(g.J1,2)+' / '+f(g.J2,2)); add('Core material','—',g.grade); add('Winding material','—',g.mat);
-  add('Mass of core / conductor / total','kg',f(g.mCore,0)+' / '+f(g.mCond,0)+' / '+f(g.mTot,0)); add('Overall dimensions L × B × H','mm',g.dims);
-  add('Insulation level (power-frequency / impulse)','kV',g.testV); add('Short-circuit withstand (IEC 60076-5)','—',g.sc); add('Noise level (estimate)','dB(A)',f(g.noise,0));
-  if(g.toc!=null) add('Total owning cost (price + capitalised losses)','₹',Math.round(g.toc).toLocaleString('en-IN'));
-  add('Standards','—',g.std); return R; }
+// g: normalised design summary built by each module (see rGtpData / roundGtpData). Layout follows the company's
+// "Schedule of Technical Particulars as per IS 2026 / IEC 60076" (sections A–F), plus the particulars tenders usually ask for.
+function gtpRows(g){ const f=(x,n)=>x==null||isNaN(x)?'—':Number(x).toFixed(n); const R=[]; let i=0; const sec=t=>R.push(['',t,'','',true]); const add=(t,u,v)=>R.push([String(++i),t,u,v==null||v===''?'—':v]);
+  const c=(typeof companyGet==='function')?companyGet():{};
+  sec('A. General information'); add('Name of the manufacturer','—',c.name||'—'); add('Customer','—',g.customer); add('Service','—',g.service); if(g.ul) add('UL / certification file','—',g.ul);
+  sec('B. Applicable standards'); add('Design and testing standard','—',g.std);
+  sec('C. Electrical'); add('kVA rating','kVA',String(g.kVA)); add('Primary voltage','V',g.w2.V+' ('+g.w2.conn+')'); add('Secondary voltage','V',g.w1.V+' ('+g.w1.conn+')');
+  add('Primary tapping voltages','V',g.taps2||'No taps'); add('Secondary tapping voltages','V',g.taps1||'No taps'); add('Tap changer','—',g.tapChanger);
+  add('Rated frequency','Hz',String(g.freq)); add('No. of phases / limbs','—',g.phases+' / '+g.limbs); add('Vector group','—',g.vg);
+  add('Rated current, primary / secondary','A',f(g.w2.I,2)+' / '+f(g.w1.I,2)); add('Harmonic content (THDi / K-factor)','—',g.thd);
+  add('Impedance at '+g.T+' °C','%',f(g.Z,2)); add('Total loss at rated voltage','W',f(g.NLL+g.LL,0)); add('No-load loss at rated voltage','W',f(g.NLL,0)); add('Load loss at rated current, '+g.T+' °C','W',f(g.LL,0)+(g.lead?' (incl. '+f(g.lead,0)+' W leads)':''));
+  add('Efficiency at unity pf: 100 / 75 / 50 % load','%',[1,0.75,0.5].map(x=>f(STD.effAt(g.kVA,g.NLL,g.LL,x,1),2)).join(' / ')); add('Efficiency at pf 0.8: 100 / 75 / 50 % load','%',[1,0.75,0.5].map(x=>f(STD.effAt(g.kVA,g.NLL,g.LL,x,0.8),2)).join(' / '));
+  add('Regulation at full load, pf 1 / pf 0.8','%',f(STD.reg(g.er,g.ex,1),2)+' / '+f(STD.reg(g.er,g.ex,0.8),2)); add('No-load current','%',f(g.I0,2));
+  add('Dielectric withstand (power frequency / impulse)','kV',g.testV); add('Secondary fault current (symmetrical / peak)','kA',g.fault); add('Inrush current (estimate)','A peak',g.inrush);
+  add('Short-circuit withstand (IEC 60076-5)','—',g.sc); add('Maximum flux density','T',f(g.B,3)); add('Current density, primary / secondary','A/mm²',f(g.J2,2)+' / '+f(g.J1,2));
+  sec('D. Mechanical'); add('Construction','—',g.construction); add('Type of core','—','Iron'); add('Core material','—',g.grade); add('Winding material','—',g.mat);
+  add('Electrostatic shield','—',g.shield); add('Insulation class','—',g.insClass); add('Interlayer insulation','—',g.interlayer); add('Primary termination','—',g.term2); add('Secondary termination','—',g.term1);
+  add('Temperature sensor','—',g.sensor); add('Approximate overall weight','kg',f(g.mTot,0)); add('Approximate overall dimensions L × W × H','mm',g.dims);
+  sec('E. Cooling system'); add('Type of cooling','—',g.cooling);
+  sec('F. Environmental conditions'); add('Ambient temperature','°C',g.ambient); add('Temperature rise, primary / secondary','K',f(g.rise2,1)+' / '+f(g.rise1,1)+' (limit '+f(g.riseLim,0)+')'); add('Humidity','—',g.humidity); add('Ingress protection','—',g.ip);
+  if(g.toc!=null){ sec('G. Evaluation'); add('Total owning cost (price + capitalised losses)','₹',Math.round(g.toc).toLocaleString('en-IN')); }
+  return R; }
 function gtpPdf(g,meta,file){ if(!window.jspdf){ toast('PDF library did not load.'); return; } const {jsPDF}=window.jspdf; const d=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'}); const ink=[23,33,43];
-  d.setDrawColor(...ink); d.setLineWidth(0.5); d.rect(10,10,190,22); d.setFont('helvetica','bold'); d.setFontSize(12); d.setTextColor(...ink); d.text('Guaranteed Technical Particulars',12,17); if(typeof pdfBrand==='function') pdfBrand(d,120,11.5,78,8); if(typeof pdfBrand==='function') pdfBrand(d,138,11.2,60,8);
-  d.setFont('helvetica','normal'); d.setFontSize(8); const cells=[['Party',meta.party||'—'],['Work order',meta.wo||'—'],['Revision',meta.rev||'R0'],['Date',new Date().toLocaleDateString('en-GB')],['Rating',g.kVA+' kVA, '+g.w2.V+' / '+g.w1.V+' V'],['Tool',APP_VERSION]];
-  cells.forEach((c,i)=>{ const x=12+(i%3)*63, y=23+Math.floor(i/3)*5; d.setTextColor(90); d.text(pdfText(c[0])+':',x,y); d.setTextColor(...ink); d.text(pdfText(c[1]).slice(0,34),x+17,y); });
-  d.autoTable({theme:'grid',startY:36,margin:{left:10,right:10,bottom:14},styles:{fontSize:7.6,cellPadding:1.1,lineColor:[150,160,170],lineWidth:0.15,textColor:ink},headStyles:{fillColor:[228,233,238],textColor:ink,fontStyle:'bold'},
-    head:[['#','Particular','Unit','Guaranteed / design value']],body:gtpRows(g).map(r=>r.map(pdfText)),columnStyles:{0:{cellWidth:8},1:{cellWidth:86,fontStyle:'bold'},2:{cellWidth:16}}});
-  const y=Math.min(d.lastAutoTable.finalY+14,275); d.setFontSize(8); d.setTextColor(90);
-  ['Designed','Checked','Approved'].forEach((t,i)=>{ const x=12+i*63; d.line(x,y,x+55,y); d.text(t+(i===0&&meta.by?': '+pdfText(meta.by):i===1&&meta.chk?': '+pdfText(meta.chk):i===2&&meta.appr?': '+pdfText(meta.appr):''),x,y+4); });
-  d.setFontSize(6); d.text(pdfText('Values are design (calculated) values; test tolerances per IEC 60076-1 / IS 2026 apply. Generated '+new Date().toLocaleString('en-GB')),10,290);
+  if(typeof pdfBrand==='function') pdfBrand(d,150,9,50,9);
+  d.setTextColor(...ink); d.setFont('helvetica','bold'); d.setFontSize(11.5); d.text('SCHEDULE OF TECHNICAL PARTICULARS AS PER IS 2026 / IEC 60076',105,20,{align:'center'});
+  d.setFont('helvetica','normal'); d.setFontSize(8); d.setTextColor(90); d.text(pdfText((meta.party?'Customer: '+meta.party+'   ':'')+(meta.wo?'Work order: '+meta.wo+'   ':'')+'Rating: '+g.kVA+' kVA, '+g.w2.V+' / '+g.w1.V+' V   Revision: '+(meta.rev||'R0')),105,25,{align:'center'});
+  const rows=gtpRows(g); d.autoTable({theme:'grid',startY:28,margin:{left:10,right:10,bottom:12},styles:{fontSize:6.8,cellPadding:0.55,lineColor:[40,40,40],lineWidth:0.15,textColor:ink},headStyles:{fillColor:[235,238,241],textColor:ink,fontStyle:'bold'},
+    head:[['Sl. No.','Description','Unit','Particulars']],body:rows.map(r=>r.slice(0,4).map(pdfText)),columnStyles:{0:{cellWidth:12,halign:'center'},1:{cellWidth:86},2:{cellWidth:16,halign:'center'},3:{halign:'center'}},
+    didParseCell:h=>{ if(h.section==='body'&&rows[h.row.index][4]){ h.cell.styles.fontStyle='bold'; h.cell.styles.fillColor=[240,243,246]; h.cell.styles.halign='left'; } }});
+  const y=Math.min(d.lastAutoTable.finalY+8,282); d.setFontSize(8); d.setTextColor(...ink); d.text(pdfText('Prepared by: '+(meta.by||'')+'      Checked by: '+(meta.chk||'')+'      Approved by: '+(meta.appr||'')+'      Date: '+new Date().toLocaleDateString('en-GB')),10,y);
+  d.setFontSize(6); d.setTextColor(90); d.text(pdfText('Design (calculated) values; test tolerances per IEC 60076-1 / IS 2026 apply. Tool '+APP_VERSION),10,290);
   saveFile(file,d.output('blob')); }
+// Tender calculations table, shared by both modules
+function tenderRows(t){ const f=(x,n)=>x==null||isNaN(x)?'—':Number(x).toFixed(n); const rows=[];
+  rows.push(['Secondary fault current (symmetrical / peak)',f(t.fault.Isc/1000,2)+' / '+f(t.fault.peak/1000,2)+' kA']);
+  rows.push(['Inrush current, energised winding (estimate)',f(t.inrush.Ipk,0)+' A peak = '+f(t.inrush.times,1)+' × rated peak'+(t.inrush.tau?'; decay τ ≈ '+f(t.inrush.tau*1000,0)+' ms':'')]);
+  rows.push(['Primary busbar / terminal (with 25 % margin)',t.bus1.size+' mm (≥ '+f(t.bus1.need,0)+' mm² at '+t.bus1.J+' A/mm²)']);
+  rows.push(['Secondary busbar / terminal (with 25 % margin)',t.bus2.size+' mm (≥ '+f(t.bus2.need,0)+' mm²)']);
+  if(t.ph===1) rows.push(['Neutral','Not applicable (single-phase)']); else rows.push(['Neutral current / busbar',f(t.neutralI,1)+' A → '+t.busN.size+' mm'+(t.harm&&t.harm.neutral>1?' (triplen harmonics exceed phase current)':'')]);
+  rows.push(['Harmonics',t.harm?('THDi '+f(t.harm.thd*100,1)+' %, K-factor '+f(t.harm.K,2)+', neutral '+f(t.harm.neutral*100,0)+' % of phase rms'):('Linear load'+(t.Kf>1?' (K-factor '+f(t.Kf,1)+' entered)':''))]);
+  if(t.ov>0) rows.push(['Temperature rise at '+t.ov+' % continuous overload',f(t.riseOv[0],1)+' / '+f(t.riseOv[1],1)+' K']);
+  if(t.worst) rows.push(['Temperature rise at the worst (lowest-voltage) taps',f(t.worst[0],1)+' / '+f(t.worst[1],1)+' K (uniform conductor; sectional conductors not modelled)']);
+  return rows; }
 function cutRows(cut){ return cut.rows.map(r=>[r.grp,String(r.step),String(r.w),(Math.round(r.stack*10)/10).toString(),String(r.qty),Math.round(r.short)+' / '+Math.round(r.long),(Math.round(r.kg*10)/10).toString()]); }
 // Alternatives table: rows with a "Use" button; cur = index of the design currently shown
 function renderAlts(sel,alts,cols,onUse){ const el=document.querySelector(sel); if(!alts||alts.length<2){ el.innerHTML=''; return; }

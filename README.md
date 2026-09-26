@@ -1,4 +1,4 @@
-# Dry-type transformer design calculator — v1.5.0
+# Dry-type transformer design calculator — v1.6.0
 
 A web app with two design modules:
 
@@ -30,7 +30,7 @@ src/                 ← edit these files
 lib/                 PDF and Excel libraries (jsPDF 2.5.1, jsPDF-AutoTable 3.8.2, SheetJS 0.18.5), built into index.html
 tools/build.py       joins src/ and lib/ into index.html
 index.html           the built app, works offline (do not edit by hand)
-tests/regression.js  63 checks against the reference designs
+tests/regression.js  72 checks against the reference designs
 supabase.sql         optional shared design library
 ```
 
@@ -85,6 +85,22 @@ File names: `{work order or party}_{RECT|ROUND}_{kVA}kVA_{HV}-{LV}V_{revision}_{
 | Excel | CAL1, Compliance, BOM, Steps, Values (numbers), Guarantees & tests, Inputs (reloadable) | Design sheet, Steps, Core steps, Taps, Checks, Values, Guarantees & tests, Inputs |
 
 ## What changed
+
+**v1.6.0**
+- **Single-phase transformers (rectangular core):**
+  - two limbs, each carrying half the turns in series;
+  - core, losses, impedance, rise, masses, cutting list and drawing are all adapted;
+  - vector group Ii0.
+- **Taps on either winding:** voltage lists such as `600, 630, 660`. The tool gives a tap table with turns and currents, sizes the conductor for the lowest-voltage tap, and checks the rise at the worst taps. Sectional conductors (thicker for the low-voltage section) are not modelled yet, so masses are conservative.
+- **Harmonic current spectrum** (both modules), for example `5:25, 7:14, 11:6, 13:4`. The tool calculates the K-factor and THDi (IEEE C57.110) and the extra eddy and stray loss, plus the neutral current from triplen harmonics.
+- **Continuous overload %** (both modules): rise at overload (IEC 60076-12, rise ∝ load^1.6) is checked, and automatic design avoids failing designs.
+- **Maximum overall L × B × H** (both modules): checked, and automatic design avoids designs that are too large.
+- **Tender calculations** (sheet, PDF, Excel):
+  - secondary fault current (symmetrical and peak);
+  - inrush estimate (air-core method) with decay time constant;
+  - primary / secondary / neutral busbar sizing.
+- **GTP in the company layout** ("Schedule of Technical Particulars as per IS 2026 / IEC 60076", sections A to F) on one page. A new **GTP details** section holds text items: service, UL file, shield, interlayer insulation, terminations, sensor, humidity and IP.
+- **New preset:** 4 kVA single-phase example (Fimer GTP). Its load loss matches the company GTP (120 W).
 
 **v1.5.0**
 - **Title block on drawings (ISO 7200 style):** title, drawing no., revision, description, scale, units, designed / checked / approved, date, company, sheet and tool version. It appears on the PDF drawing page and in the DXF.
@@ -267,7 +283,7 @@ Each rule is one line: `POS('kVA','Rating','kVA',{req:true,max:5000})` means "re
 | Page title and intro | `<header class="top">` | `src/page.html` |
 
 ## Checking a change
-- **Automatic:** `python tools/build.py --check` and `node tests/regression.js` (63 checks). Both run in CI on every push.
+- **Automatic:** `python tools/build.py --check` and `node tests/regression.js` (72 checks). Both run in CI on every push.
 - **Manual:** **Your 70 kVA sheet** must show 2.91 %, 268 W, 1,384 W and 298 kg.
 - **Intentional rule change** (for example after calibration): update the expected value in `tests/regression.js` in the same commit, with the test report reference.
 

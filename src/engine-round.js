@@ -110,7 +110,8 @@ function design(p){
   S(22,'LV conductor weight','Bare = LMT × N × A × 3 × ρ; insulated & procurement', r1(lvBare,1)+' / '+r1(lvIns,1)+' / '+r1(lvProc,1)+' kg','Bare / insulated / procurement');
   const coefLV=Math.sqrt(Math.PI*f*4*Math.PI*1e-7/(rho(mLV)*1e-6))/1000; // per mm
   const fillLV=Math.min(1,(L.b*L.a*Math.ceil(tpl))/L.Lw); const mR=L.r*lvLayers;
-  const lvStray=100*((mR*mR-0.2)/9)*Math.pow(Math.sqrt(fillLV)*coefLV*L.h,4);
+  const hSpec=STD.parseSpectrum(p.harmonics); const harm=hSpec?STD.harmonics(hSpec):null; out.harm=harm; const Kf=harm?harm.K:(p.kFactor||1); out.Kf=Kf;
+  const lvStray=100*((mR*mR-0.2)/9)*Math.pow(Math.sqrt(fillLV)*coefLV*L.h,4)*Kf;
   S(23,'LV stray (eddy) loss','[√fill × '+r1(coefLV*10,4)+' × h/10]⁴ × (m² − 0.2)/9; m = '+mR+', fill = '+r1(fillLV,3), r1(lvStray,3)+' %');
   const lvI2R=3*Ilv*Ilv*Rlv; const lvLL=lvI2R*(1+lvStray/100);
   S(24,'LV load loss','3 × I² × R × (1 + stray) = 3 × '+r1(Ilv,2)+'² × '+(Rlv*1000).toFixed(4)+'e-3 × '+r1(1+lvStray/100,4), Math.round(lvLL)+' W');
@@ -159,7 +160,7 @@ function design(p){
   S(37,'HV conductor weight','Bare / insulated / procurement', r1(hvBare,1)+' / '+r1(hvInsW,1)+' / '+r1(hvProc,1)+' kg');
   const coefHV=Math.sqrt(Math.PI*f*4*Math.PI*1e-7/(rho(mHV)*1e-6))/1000*(H.type==='round'?0.83:1);
   const hvAxBare=H.type==='round'?H.d:H.w*H.np; const fillHV=Math.min(1,hvAxBare*hvTpl*coils/hvLw);
-  const hvStray=100*((hvLayers*hvLayers-0.2)/9)*Math.pow(Math.sqrt(fillHV)*coefHV*H.radb,4);
+  const hvStray=100*((hvLayers*hvLayers-0.2)/9)*Math.pow(Math.sqrt(fillHV)*coefHV*H.radb,4)*Kf;
   S(38,'HV stray (eddy) loss','[√fill × '+r1(coefHV*10,4)+' × h/10]⁴ × (m² − 0.2)/9; m = '+hvLayers+', fill = '+r1(fillHV,3), r1(hvStray,3)+' %');
   const hvLL=3*Ihv*Ihv*Rhv*(1+hvStray/100), hvLLmin=3*Imin*Imin*RhvMin*(1+hvStray/100);
   S(39,'HV load loss','3 × I² × R × (1 + stray)', Math.round(hvLL)+' W (normal) / '+Math.round(hvLLmin)+' W (lowest tap)');
@@ -230,6 +231,15 @@ function design(p){
   { const wi=scRes.windings[0]; const cLim=STD.compLimit(wi.stressLim,p.bonded); const sEq=wi.sigma*(lvLayers>=3?1.1:1);
     chk('Short-circuit hoop stress, LV (compressive)','≤ '+r1(cLim,1)+' MPa ('+(p.bonded?'0.6':'0.35')+' × Rp0.2, IS 2026-5 Annex A)',r1(sEq,1)+' MPa',sEq<=cLim); }
   { const zMin=STD.zMin(kVA); if(ek<zMin) out.warn.push('Impedance '+r1(ek,2)+' % is below the IEC 60076-5 recognised minimum of '+zMin+' %: short-circuit withstand is subject to agreement with the purchaser.'); }
+  // Continuous overload, dimension limits and tender calculations
+  out.ov=p.overload||0; out.lvRiseOv=STD.overloadRise(lvGrad,out.ov); out.hvRiseOv=STD.overloadRise(hvGrad,out.ov);
+  if(out.ov>0) chk('Temperature rise at '+out.ov+' % continuous overload','≤ '+r1(riseLim,1)+' K (IEC 60076-12, rise ∝ load^1.6)',r1(out.lvRiseOv,1)+' / '+r1(out.hvRiseOv,1)+' K',Math.max(out.lvRiseOv,out.hvRiseOv)<=riseLim);
+  if(p.maxL||p.maxB||p.maxH){ const d=out.dims, Lx=p.enclosure?d.eL:d.activeL, Bx=p.enclosure?d.eB:d.activeB, Hx=p.enclosure?d.eH:d.activeH;
+    chk('Overall dimensions within limit',(p.maxL||'—')+' × '+(p.maxB||'—')+' × '+(p.maxH||'—')+' mm',Lx+' × '+Bx+' × '+Hx+' mm',(!p.maxL||Lx<=p.maxL)&&(!p.maxB||Bx<=p.maxB)&&(!p.maxH||Hx<=p.maxH)); }
+  { const I2line=kVA*1000/(Math.sqrt(3)*p.lvV), I1line=kVA*1000/(Math.sqrt(3)*p.hvV);
+    out.fault=STD.faultLevel(I2line,ek,scRes.zs,scRes.kpk); out.fault.side='LV';
+    const Dm=(hvID+hvOD)/2/1000; out.inrush=STD.inrush({Bm:Bact,Acore_m2:Anet/1e6,Aw_m2:Math.PI*Dm*Dm/4,Lw_m:hvWound/1000,N:Nn,R:Rhv,Irated:Ihv,f});
+    out.bus1=STD.busbar(I1line*(Vhv/Vmin),p.hvMat); out.bus2=STD.busbar(I2line,p.lvMat); const In=(harm?Math.max(1,harm.neutral):1)*I2line; out.neutralI=In; out.busN=STD.busbar(In,p.lvMat); }
   if(p.maxLoss50) chk('Total loss at 50 % load (IS 1180 / customer)','≤ '+p.maxLoss50+' W',Math.round(loss50)+' W',loss50<=p.maxLoss50);
   if(p.maxLoss100) chk('Total loss at 100 % load (IS 1180 / customer)','≤ '+p.maxLoss100+' W',Math.round(NLL+LLtot)+' W',NLL+LLtot<=p.maxLoss100);
   if(p.noiseMax) chk('Noise (estimate)','≤ '+p.noiseMax+' dB',r1(noise,1)+' dB',noise<=p.noiseMax);

@@ -37,10 +37,15 @@ function rectDesign(p){
   const priLow=p.priV<=p.secV;
   const W1={role:priLow?'Primary':'Secondary',V:priLow?p.priV:p.secV,conn:priLow?p.priConn:p.secConn};
   const W2={role:priLow?'Secondary':'Primary',V:priLow?p.secV:p.priV,conn:priLow?p.secConn:p.priConn};
-  for(const w of [W1,W2]){ w.Vph=w.conn==='Y'?w.V/sq3:w.V; w.Iph=w.conn==='Y'?p.kVA*1000/(sq3*w.V):p.kVA*1000/(3*w.V); }
+  // Phases: 3 (three limbs) or 1 (single-phase, two limbs, each limb carrying half the turns in series)
+  const ph=p.phases===1?1:3, nl=ph===1?2:3, perLimb=ph===1?0.5:1; o.ph=ph; o.nl=nl;
+  for(const w of [W1,W2]){ if(ph===1){ w.conn='1'; w.Vph=w.V; w.Iph=p.kVA*1000/w.V; } else { w.Vph=w.conn==='Y'?w.V/sq3:w.V; w.Iph=w.conn==='Y'?p.kVA*1000/(sq3*w.V):p.kVA*1000/(3*w.V); } }
+  // Tapped windings: voltages list; the conductor is sized for the current at the lowest-voltage tap (worst case)
+  const tapsOf=(role)=>(role==='Primary'?p.priTaps:p.secTaps)||[];
+  for(const w of [W1,W2]){ const t=tapsOf(w.role).filter(v=>v>0&&v!==w.V); w.tapV=t; const vmin=Math.min(w.V,...t); w.Vmin=vmin; w.Idesign=w.Iph*w.V/vmin; }
   const sheet=p.basis==='sheet';
   // V/t (sheet: 1.01 × √(kVA/3) × K/100)
-  const Vt0=1.01*Math.sqrt(p.kVA/3)*p.K/100; const vr=W2.Vph/W1.Vph;
+  const Vt0=1.01*Math.sqrt(p.kVA/ph)*p.K/100; const vr=W2.Vph/W1.Vph;
   let N1,N2;
   if(p.N1&&p.N2){ N1=p.N1; N2=p.N2; }
   else if(p.N1){ N1=p.N1; N2=Math.round(N1*vr); }
@@ -61,7 +66,8 @@ function rectDesign(p){
   const Anet=sheet?Areq:W*D*sf/100; const Bact=Vt/(4.44*f*Anet*1e-4);
   const cW=W+p.plateW, cD=D+p.plateD;
   // Windings
-  const L1=p.lvLayers, L2=p.hvLayers; const tpl1=N1/L1, tpl2=N2/L2; const tplAx1=rcTplAx(N1,L1), tplAx2=rcTplAx(N2,L2);
+  const N1l=N1*perLimb, N2l=N2*perLimb; // turns on one limb
+  const L1=p.lvLayers, L2=p.hvLayers; const tpl1=N1l/L1, tpl2=N2l/L2; const tplAx1=rcTplAx(N1l,L1), tplAx2=rcTplAx(N2l,L2);
   const C1=rcCond(p.lvCond,p.lvIns), C2=rcCond(p.hvCond,p.hvIns);
   const len1=rcWindLen(C1,tplAx1,p.lvTransp+p.lvComp+p.lvAxDucts), len2=rcWindLen(C2,tplAx2,p.hvTransp+p.hvComp+p.hvAxDucts);
   const imp1=len1-(C1.bi*C1.ax), imp2=sheet?Math.round(len2-C2.bi*C2.ax):len2-C2.bi*C2.ax;
@@ -80,9 +86,9 @@ function rectDesign(p){
   const T=p.windTemp; const sig1=rcSigma(p.mat,T,p.condBasis,p.sigmaCustom); const mat=RC.COND[p.mat];
   const wire1=m1/1000*N1, wire2=m2/1000*N2;
   const Rw1=wire1/(C1.cs*sig1), Rw2=wire2/(C2.cs*sig1);
-  const bare1=wire1*C1.cs*mat.dens*3/1000, bare2=wire2*C2.cs*mat.dens*3/1000;
+  const bare1=wire1*C1.cs*mat.dens*ph/1000, bare2=wire2*C2.cs*mat.dens*ph/1000;
   const insA=(C)=>C.type==='round'?(Math.PI/4*(C.bi*C.bi-C.b*C.b)):(C.bi*C.hi-C.b*C.h);
-  const ins1=bare1+insA(C1)*C1.rad*C1.ax*wire1*2*3/1000, ins2=bare2+insA(C2)*C2.rad*C2.ax*wire2*2*3/1000;
+  const ins1=bare1+insA(C1)*C1.rad*C1.ax*wire1*2*ph/1000, ins2=bare2+insA(C2)*C2.rad*C2.ax*wire2*2*ph/1000;
   // Impedance geometry
   const h=(imp1+imp2)/2, bb=rad1+p.delta/2+rad2; const kr=1-1/((h/bb)*Math.PI); const Ls=h/kr;
   const dP=(p.delta/2)*mg+(rad1*m1+rad2*m2)/3;
@@ -94,28 +100,29 @@ function rectDesign(p){
   else { const fill=(C,tpl,len)=>Math.min(1,C.b*C.ax*(tpl+RC_EXTRA_TURN)*kr/len); const m=(L,C)=>L*C.rad; const k=(C)=>C.type==='round'?sf1*0.83:sf1;
     st1=Math.pow((C1.h/10)*Math.sqrt(fill(C1,tplAx1,len1))*k(C1),4)*((m(L1,C1))**2-0.2)/9*100; st2=Math.pow((C2.h/10)*Math.sqrt(fill(C2,tplAx2,len2))*k(C2),4)*((m(L2,C2))**2-0.2)/9*100; }
   // Harmonic (non-linear) loading: winding eddy × K, other stray × K^0.8
-  const Kf=p.kFactor||1; st1*=STD.kEddy(Kf); st2*=STD.kEddy(Kf);
-  const LL1=W1.Iph**2*Rw1*3*(1+st1/100), LL2=W2.Iph**2*Rw2*3*(1+st2/100); const tank=Math.ceil(p.kVA*p.tankWkVA*STD.kOther(Kf));
+  const hSpec=STD.parseSpectrum(p.harmonics); const harm=hSpec?STD.harmonics(hSpec):null; o.harm=harm;
+  const Kf=harm?harm.K:(p.kFactor||1); st1*=STD.kEddy(Kf); st2*=STD.kEddy(Kf);
+  const LL1=W1.Iph**2*Rw1*ph*(1+st1/100), LL2=W2.Iph**2*Rw2*ph*(1+st2/100); const tank=Math.ceil(p.kVA*p.tankWkVA*STD.kOther(Kf));
   const LL=LL1+LL2+tank;
   const er=sheet?rnd((LL/p.kVA)*0.1,2):LL/(p.kVA*10);
-  const ex=(8*Math.PI**2*f*W1.Iph*N1*dP*1e-8)/(Ls*Vt); const ek=Math.sqrt(er*er+ex*ex);
+  const ex=(8*Math.PI**2*f*W1.Iph*N1l*dP*1e-8)/(Ls*Vt); const ek=Math.sqrt(er*er+ex*ex);
   // Core mass & loss (tables are 50 Hz; corrected for other frequencies)
-  const coreMass=(limb*3+yokeL*2)*0.1*Anet*7.65e-3;
+  const yokeLc=ph===1?Cd+W:yokeL; const coreMass=(limb*nl+yokeLc*2)*0.1*Anet*7.65e-3;
   const spec=rcLookup(RC.CORELOSS.B,RC.CORELOSS[p.grade],Bact,sheet?'floor':'lin')*STD.fLoss(f);
   const NLL=coreMass*p.coreFactor*spec*p.buildF;
   // No-load current
   const vakg=rcLookup(RC.VAKG.B,RC.VAKG.v,Bact,sheet?'floor':'lin')*STD.fVA(f); const vacm=(11.823*Bact**3-44.891*Bact**2+61.585*Bact-29.304)*STD.fVA(f);
-  const mLimb=W*D*sf*limb*3*7.65e-6, mYoke=W*D*(Cd-W)*sf*4*7.65e-6, mCorner=W*W*D*sf*6*7.65e-6;
-  const vaLimb=vakg*mLimb, vaYoke=vakg*mYoke, vaCorner=6*vakg*mCorner, vaGap=6*vacm*W*D*sf*1e-2; const VA=vaLimb+vaYoke+vaCorner+vaGap; const I0=VA/(p.kVA*1000)*100;
-  const extraNL=((I0/100)*W2.Iph)**2*Rw2*3;
+  const nCorner=ph===1?4:6, nYokeSeg=ph===1?2:4; const mLimb=W*D*sf*limb*nl*7.65e-6, mYoke=W*D*(Cd-W)*sf*nYokeSeg*7.65e-6, mCorner=W*W*D*sf*nCorner*7.65e-6;
+  const vaLimb=vakg*mLimb, vaYoke=vakg*mYoke, vaCorner=6*vakg*mCorner, vaGap=nCorner*vacm*W*D*sf*1e-2; const VA=vaLimb+vaYoke+vaCorner+vaGap; const I0=VA/(p.kVA*1000)*100;
+  const extraNL=((I0/100)*W2.Iph)**2*Rw2*ph;
   // Thermal (design-sheet rule, with calibration factors from heat-run tests)
   const S1=m1/1000*(imp1/1000)*(2+2*p.lvDucts), S2=m2/1000*(imp2/1000)*(2+2*p.hvDucts);
-  const q1=LL1/(3*S1), q2=LL2/(3*S2);
+  const q1=LL1/(nl*S1), q2=LL2/(nl*S2);
   const rise1=(15+q1/5)*(p.riseCal1||1), rise2=(sheet?15+Math.round(q2/7):15+q2/7)*(p.riseCal2||1);
   const hal=(q,len)=>Math.pow(q*Math.pow(len/1000,0.25)/1.4255,0.8);
   const coreSa=((2*W+D)*yokeL+(W*D*4))*1e-2, wdgSa=m2*imp2*1e-2*3; const mcly=450*Math.pow((NLL+LL)/(coreSa+wdgSa),0.826);
   // Mechanical
-  const aL=r5(2*Cd+(OD2w-W)), aB=r5(OD2d+p.leads), aH=r5(5+2*W+limb);
+  const aL=r5((nl-1)*Cd+(OD2w-W)), aB=r5(OD2d+p.leads), aH=r5(5+2*W+limb);
   const oL=r5(aL+2*p.clrL), oB=r5(aB+2*p.clrB), oH=r5(aH+p.clrTop+p.clrBot);
   // BOM
   const bom=[]; const add=(k,q,pr)=>bom.push({k,q,pr,amt:q*pr});
@@ -133,16 +140,28 @@ function rectDesign(p){
   const ilReq1=ilReq(tplAx1,p.lvIns), ilReq2=ilReq(tplAx2,p.hvIns);
   // Short-circuit withstand (IEC 60076-5)
   const riseLim=p.riseLimit*STD.altitudeFactor(p.altitude);
-  const sc=STD.shortCircuit({kVA:p.kVA,ek,er,ex,faultMVA:p.faultMVA,t:p.scTime||2,amb:p.amb,insClass:p.insClass,perim_m:mg/1000,h_m:Ls/1000,span_mm:bb},
-    [{name:W1.role+' (inner)',I:W1.Iph,N:N1,cs:C1.cs,mat:p.mat,rise:rise1,outer:false,stressLim:p.mat==='Cu'?p.stressCu:p.stressAl},
-     {name:W2.role+' (outer)',I:W2.Iph,N:N2,cs:C2.cs,mat:p.mat,rise:rise2,outer:true,stressLim:p.mat==='Cu'?p.stressCu:p.stressAl}]);
+  const sc=STD.shortCircuit({kVA:p.kVA/(ph===1?1:1),ek,er,ex,faultMVA:p.faultMVA,t:p.scTime||2,amb:p.amb,insClass:p.insClass,perim_m:mg/1000,h_m:Ls/1000,span_mm:bb},
+    [{name:W1.role+' (inner)',I:W1.Iph,N:N1l,cs:C1.cs,mat:p.mat,rise:rise1,outer:false,stressLim:p.mat==='Cu'?p.stressCu:p.stressAl},
+     {name:W2.role+' (outer)',I:W2.Iph,N:N2l,cs:C2.cs,mat:p.mat,rise:rise2,outer:true,stressLim:p.mat==='Cu'?p.stressCu:p.stressAl}]);
   const noise=STD.noise(p.noiseA,p.noiseB,coreMass,Bact);
   Object.assign(o,{W1,W2,Vt0,Vt,N1,N2,rerr,sf,Areq,Anet,W,D,Bact,cW,cD,L1,L2,tpl1,tpl2,tplAx1,tplAx2,C1,C2,len1,len2,imp1,imp2,rad1,rad2,limb,end1,end2,
     ID1w,ID1d,OD1w,OD1d,ID2w,ID2d,OD2w,OD2d,Cd,yokeL,winW,R:[R1,R2,R3,R4],P:[P1,P2,P3,P4],m1,mg,m2,sig:sig1,wire1,wire2,Rw1,Rw2,bare1,bare2,ins1,ins2,
     h,bb,kr,Ls,dP,st1,st2,LL1,LL2,tank,LL,er,ex,ek,coreMass,spec,NLL,vakg,vacm,mLimb,mYoke,mCorner,vaLimb,vaYoke,vaCorner,vaGap,VA,I0,extraNL,
     S1,S2,q1,q2,rise1,rise2,hal1:hal(q1,imp1),hal2:hal(q2,imp2),coreSa,wdgSa,mcly,aL,aB,aH,oL,oB,oH,bom,totMass,matCost,others,cost:matCost+others,rmc,eff,eff50,coreWdg,
     J1:W1.Iph/C1.cs,J2:W2.Iph/C2.cs,ilReq1,ilReq2,sc,noise,riseLim,Kf,
-    toc:STD.toc(matCost+others,NLL,LL,p.capA,p.capB), cut:STD.cutList([{w:W,stack:D}],limb,Cd,sf)});
+    toc:STD.toc(matCost+others,NLL,LL,p.capA,p.capB), cut:ph===1?STD.cutList1ph(W,D,limb,Cd,sf):STD.cutList([{w:W,stack:D}],limb,Cd,sf),N1l,N2l,yokeLc});
+  // Tap tables and worst-tap loading (the lowest-voltage tap carries the highest current through its turns)
+  const tapTable=(w,N)=>[w.V,...w.tapV].sort((a,b)=>b-a).map(V=>({V,N:Math.round(N*V/w.V),I:w.Iph*w.V/V}));
+  o.taps1=tapTable(W1,N1); o.taps2=tapTable(W2,N2); o.Jd1=W1.Idesign/C1.cs; o.Jd2=W2.Idesign/C2.cs;
+  const wr1=W1.V/W1.Vmin, wr2=W2.V/W2.Vmin; o.LL1w=LL1*wr1; o.LL2w=LL2*wr2; o.rise1w=rise1*Math.pow(wr1,0.8); o.rise2w=rise2*Math.pow(wr2,0.8);
+  // Continuous overload and tender calculations
+  o.ov=p.overload||0; o.rise1ov=STD.overloadRise(o.rise1w,o.ov); o.rise2ov=STD.overloadRise(o.rise2w,o.ov);
+  { const Ws=W1.role==='Secondary'?W1:W2; o.fault=STD.faultLevel(Ws.Iph*(ph===1?1:(Ws.conn==='Y'?1:Math.sqrt(3))),ek,sc.zs,sc.kpk); o.fault.side=Ws.role; }
+  { const pri=W1.role==='Primary'?{C:C1,N:N1l,ID:[ID1w,ID1d],OD:[OD1w,OD1d],len:len1,R:Rw1*perLimb}:{C:C2,N:N2l,ID:[ID2w,ID2d],OD:[OD2w,OD2d],len:len2,R:Rw2*perLimb};
+    const Aw=((pri.ID[0]+pri.OD[0])/2)*((pri.ID[1]+pri.OD[1])/2)/1e6; const Wp=W1.role==='Primary'?W1:W2;
+    o.inrush=STD.inrush({Bm:Bact,Acore_m2:Anet/1e4,Aw_m2:Aw,Lw_m:pri.len/1000,N:pri.N,R:pri.R,Irated:Wp.Iph,f}); }
+  { const lineI=w=>ph===1?w.Iph:(w.conn==='Y'?w.Iph:w.Iph*Math.sqrt(3)); o.bus1=STD.busbar(lineI(W1)*(W1.V/W1.Vmin),p.mat); o.bus2=STD.busbar(lineI(W2)*(W2.V/W2.Vmin),p.mat);
+    const In=(harm?Math.max(1,harm.neutral):1)*lineI(W1.role==='Secondary'?W1:W2); o.neutralI=In; o.busN=STD.busbar(In,p.mat); }
   // Compliance
   const zLo=p.zTarget*(1-p.zTolMinus/100), zHi=p.zTarget*(1+p.zTolPlus/100);
   o.zLo=zLo; o.zHi=zHi; o.ratioLim=STD.ratioLimit(ek);
@@ -151,7 +170,11 @@ function rectDesign(p){
   chk('Impedance @'+T+' °C',p.zTarget+' % (+'+p.zTolPlus+' / −'+p.zTolMinus+' %) → '+rnd(zLo,2)+'–'+rnd(zHi,2)+' %',rnd(ek,2)+' %',ek>=zLo-1e-9&&ek<=zHi+1e-9);
   chk('Efficiency @'+T+' °C, 100 % load','> '+p.effMin+' %',rnd(eff,2)+' %',eff>p.effMin);
   chk('Winding temperature rise (inner / outer)','≤ '+rnd(riseLim,1)+' K at '+p.amb+' °C ambient'+(riseLim<p.riseLimit?' (altitude '+p.altitude+' m)':''),rnd(rise1,1)+' / '+rnd(rise2,1)+' K',Math.max(rise1,rise2)<=riseLim);
-  const hs=STD.hotSpot(p.insClass,p.amb,Math.max(rise1,rise2)); o.hs=hs;
+  if(W1.tapV.length||W2.tapV.length) chk('Temperature rise at the worst taps','≤ '+rnd(riseLim,1)+' K (lowest-voltage taps)',rnd(o.rise1w,1)+' / '+rnd(o.rise2w,1)+' K',Math.max(o.rise1w,o.rise2w)<=riseLim);
+  if(o.ov>0) chk('Temperature rise at '+o.ov+' % continuous overload','≤ '+rnd(riseLim,1)+' K (IEC 60076-12, rise ∝ load^1.6)',rnd(o.rise1ov,1)+' / '+rnd(o.rise2ov,1)+' K',Math.max(o.rise1ov,o.rise2ov)<=riseLim);
+  if(p.maxL||p.maxB||p.maxH){ const L=p.enclosure?oL:aL, B=p.enclosure?oB:aB, H=p.enclosure?oH:aH;
+    chk('Overall dimensions within limit',(p.maxL||'—')+' × '+(p.maxB||'—')+' × '+(p.maxH||'—')+' mm',L+' × '+B+' × '+H+' mm'+(p.enclosure?' (enclosure)':' (active part)'),(!p.maxL||L<=p.maxL)&&(!p.maxB||B<=p.maxB)&&(!p.maxH||H<=p.maxH)); }
+  const hs=STD.hotSpot(p.insClass,p.amb,Math.max(rise1,rise2,o.ov>0?Math.max(o.rise1ov,o.rise2ov):0)); o.hs=hs;
   chk('Hot-spot temperature (IEC 60076-12)','≤ '+hs.max+' °C (class '+p.insClass+', Table 2)',rnd(hs.tHS,0)+' °C = '+p.amb+' + 1.25 × '+rnd(Math.max(rise1,rise2),1)+' K',hs.ok);
   chk('Turns-ratio error (IEC 60076-1)','≤ '+rnd(o.ratioLim,3)+' % (lower of 0.5 % and Z/10)',rnd(rerr,3)+' %',Math.abs(rerr)<=o.ratioLim+1e-9);
   chk('Flux density','≤ 1.55 T for low noise',rnd(Bact,3)+' T',Bact<=1.55);
@@ -203,7 +226,7 @@ function rcScore(o,p,d1){
   if(Math.abs(o.rerr)>o.ratioLim) s+=40; if(o.Bact>1.6) s+=30;
   if(p.scRequired){ for(const w of o.sc.windings){ if(!w.thermalOk) s+=40+(w.th1-w.lim)*0.2; } if(!o.sc.windings[1].stressOk) s+=25; }
   // every other failed check costs 15
-  for(const c of o.checks){ if(!c.ok&&/Flux|Noise|Current density|Hot-spot|Inter-layer/.test(c.name)) s+=15; }
+  for(const c of o.checks){ if(!c.ok&&/Flux|Noise|Current density|Hot-spot|Inter-layer/.test(c.name)) s+=15; if(!c.ok&&/worst taps|overload|dimensions/.test(c.name)) s+=60; }
   if(p.llTarget){ const tol=p.llTol??5, dev=(o.LL-p.llTarget)/p.llTarget*100; if(dev>0) s+=30+dev*3; else if(dev<-tol) s+=10+(-tol-dev); }
   if(p.capA||p.capB) s+= o.toc/(p.kVA*1000)*p.wCost + (d1+o.p.hvDucts)*0.3;
   else s+= o.cost/(p.kVA*1000)*p.wCost + (o.NLL+o.LL)/(p.kVA*10)*p.wLoss + (d1+o.p.hvDucts)*0.3;
@@ -219,7 +242,7 @@ var rectAuto1=function(p,opt){
   let best=null,bestS=Infinity,count=0; const cands=[];
   for(const K of Ks){
     const probe=rectDesign({...base,K,W:80,D:null,lvLayers:1,hvLayers:1,lvCond:{type:'strip',b:10,h:3,rad:1,ax:1},hvCond:{type:'strip',b:10,h:3,rad:1,ax:1},lvDucts:0,hvDucts:0});
-    const N1=probe.N1,N2=probe.N2, I1=probe.W1.Iph, I2=probe.W2.Iph; const Areq=probe.Areq, sf=probe.sf;
+    const N1=probe.N1l,N2=probe.N2l, I1=probe.W1.Idesign, I2=probe.W2.Idesign; const Areq=probe.Areq, sf=probe.sf;
     const Ws=p.W?[p.W]:RC.LAM.filter(w=>{const D=Areq/sf/(w*0.1)*10; return D/w>=1.1&&D/w<=2.6;});
     const bothFixed=p.lvCondFixed&&p.hvCondFixed;
     for(const jf of (bothFixed?[1]:Jfs)){ const J1=J10*jf, J2=J20*jf;
@@ -278,5 +301,5 @@ const RC_DEFAULTS={kVA:70,freq:50,priV:433,priConn:'D',secV:400,secConn:'Y',vg:'
   lvLayers:4,hvLayers:4,lvCond:{type:'strip',b:10.5,h:3.5,rad:1,ax:2},hvCond:{type:'strip',b:10.5,h:3.5,rad:1,ax:1},lvIns:0.11,hvIns:0.11,lvIL:0.13,hvIL:0.13,
   extraTurn:1,roundLen:false,lvDucts:0,hvDucts:0,lvDuctW:8,hvDuctW:8,lvAxDucts:0,hvAxDucts:0,lvTransp:0,hvTransp:0,lvComp:0,hvComp:0,bulge:1.1,
   tankWkVA:1.5,coreFactor:1.32,buildF:1.5,leads:0,clrL:250,clrB:260,clrTop:250,clrBot:75,enclosure:false,enclThk:2,
-  altitude:1000,faultMVA:null,scTime:2,scRequired:false,ovPct:10,bSat:1.9,capA:null,capB:null,llTarget:null,llTol:5,stressCu:80,stressAl:35,bonded:false,bendModel:'bonded',supports:0,kFactor:1,riseCal1:1,riseCal2:1,noiseA:22,noiseB:35,Eb:10000,
+  altitude:1000,faultMVA:null,scTime:2,scRequired:false,phases:3,priTaps:[],secTaps:[],harmonics:'',overload:0,maxL:null,maxB:null,maxH:null,ovPct:10,bSat:1.9,capA:null,capB:null,llTarget:null,llTol:5,stressCu:80,stressAl:35,bonded:false,bendModel:'bonded',supports:0,kFactor:1,riseCal1:1,riseCal2:1,noiseA:22,noiseB:35,Eb:10000,
   price:{core:270,coreSteel:200,cond:440,leads:440,fg:500,connFg:500,clh:5950,resin:650,crca:90,others:15},wCost:1,wLoss:0.5};

@@ -210,6 +210,9 @@ table.cmp{border-collapse:collapse;width:100%;font-size:12.5px;margin-top:6px}ta
       <label><b>Max total loss @50 %, W</b><input name="maxLoss50" type="number" step="1" placeholder="IS 1180 / customer"></label>
       <label><b>Max total loss @100 %, W</b><input name="maxLoss100" type="number" step="1" placeholder="IS 1180 / customer"></label>
       <label><b>Noise max, dB</b><input name="noiseMax" type="number" step="1" placeholder="optional"></label>
+      <label class="full"><b>Harmonic current spectrum</b><input name="harmonics" placeholder="order:% of fundamental, e.g. 5:25, 7:14, 11:6, 13:4" title="Leave blank for linear loads or to use the K-factor field"></label>
+      <label><b>Continuous overload, %</b><input name="overload" type="number" step="1" min="0" placeholder="0"></label>
+      <label><b>Max overall L × B × H, mm</b><span class="pair"><input name="maxL" type="number" aria-label="maximum length" placeholder="L"><input name="maxB" type="number" aria-label="maximum breadth" placeholder="B"><input name="maxH" type="number" aria-label="maximum height" placeholder="H"></span></label>
       <label><b>Load loss target, W</b><input name="llTarget" type="number" step="1" placeholder="none"></label>
       <label><b>Target tolerance (−), %</b><input name="llTol" type="number" step="0.5" placeholder="5"></label>
       <label><b>Lead loss, W</b><input name="leadLoss" type="number" step="1" placeholder="0"></label>
@@ -264,6 +267,20 @@ table.cmp{border-collapse:collapse;width:100%;font-size:12.5px;margin-top:6px}ta
     <p class="hint">Automatic rules follow the step method: clearances by HV insulation level (IS 11171), duct width by winding length, LV parallels chosen for the fewest strips with height ≤ 5 mm (Cu) or 6 mm (Al).</p>
   </details>
 
+  <details class="sec">
+    <summary>GTP details <small>text shown on the GTP</small></summary>
+    <div class="grid2">
+      <label class="full"><b>Service / type</b><input name="gService" placeholder="e.g. Indoor, VPI process dry type auxiliary transformer"></label>
+      <label><b>UL / certification file</b><input name="gUL" placeholder="optional"></label>
+      <label><b>Electrostatic shield</b><input name="gShield" placeholder="e.g. Copper, between windings"></label>
+      <label><b>Interlayer insulation</b><input name="gInterlayer" placeholder="e.g. NPN / Nomex"></label>
+      <label><b>Temperature sensor</b><input name="gSensor" placeholder="e.g. PT100 / thermistor 130 °C"></label>
+      <label><b>Primary termination</b><input name="gTerm1" placeholder="e.g. 6 mm² connector"></label>
+      <label><b>Secondary termination</b><input name="gTerm2" placeholder="e.g. 16 mm² connector"></label>
+      <label><b>Humidity</b><input name="gHumidity" placeholder="e.g. 95 % non-condensing"></label>
+      <label><b>Ingress protection</b><input name="gIP" placeholder="e.g. IP00 / IP23"></label>
+    </div>
+  </details>
   <details class="sec">
     <summary>Sheet header</summary>
     <div class="grid2">
@@ -343,7 +360,7 @@ const PRESETS={
   p1600:{...BASE,kVA:1600,k:0.428,B:1.596,Jlv:2.33,Jhv:2.14,tapPlus:5,tapMinus:5,tapStep:2.5,zTarget:6.25,refTemp:90,window:1217,lvEnd:60,hvEnd:140,lvDucts:1,lvDuctT:16,
     hvCoils:8,hvCond:'strip',lvhvGap:50,phaseGap:60,ref:'1600 kVA 11000/415 V Class F'}
 };
-const NUM=new Set(['kVA','freq','hvV','lvV','k','B','Jlv','Jhv','tapPlus','tapMinus','tapStep','zTarget','refTemp','window','coreDia','lvEnd','hvEnd','lvTurns','lvLayers','lvAx','lvRad','lvTransp','lvDucts','lvDuctT','coreLV','hvCoils','hvDucts','hvDuctT','lvhvGap','phaseGap','hvCoilGap','hvMinIns','lvIns','hvInsRound','hvInsStrip','enclClr','amb','altitude','faultMVA','scTime','maxLoss50','maxLoss100','noiseMax','riseCal1','riseCal2','pCore','pCu','pAl','llTarget','llTol','leadLoss','capA','capB','ovPct','bSat','coreSteps','stepMult','minStep']);
+const NUM=new Set(['kVA','freq','hvV','lvV','k','B','Jlv','Jhv','tapPlus','tapMinus','tapStep','zTarget','refTemp','window','coreDia','lvEnd','hvEnd','lvTurns','lvLayers','lvAx','lvRad','lvTransp','lvDucts','lvDuctT','coreLV','hvCoils','hvDucts','hvDuctT','lvhvGap','phaseGap','hvCoilGap','hvMinIns','lvIns','hvInsRound','hvInsStrip','enclClr','amb','altitude','faultMVA','scTime','maxLoss50','maxLoss100','noiseMax','riseCal1','riseCal2','pCore','pCu','pAl','llTarget','llTol','leadLoss','capA','capB','ovPct','bSat','coreSteps','stepMult','minStep','overload','maxL','maxB','maxH']);
 function loadPreset(key){ const p=PRESETS[key]; for(const el of form.elements){ if(!el.name) continue; const v=p[el.name]; el.value=(v===undefined||v===null)?'':v; } run(); }
 function readInputs(){
   const v={}; for(const el of form.elements){ if(!el.name) continue; const s=el.value.trim(); v[el.name]=NUM.has(el.name)?(s===''?null:parseFloat(s)):s; }
@@ -440,7 +457,8 @@ function buildModel(o,m){
     ['No-load loss',o.loss.NLL,'W'],['Load loss',o.loss.LL,'W'],['Total loss 50 %',o.loss.total50,'W'],['No-load current',o.nl.I0,'%'],['Ex',o.imp.ex,'%'],['Er',o.imp.er,'%'],['Ez',o.imp.ek,'%'],['Efficiency 100 %',o.loss.eff100,'%'],
     ['LV rise',lv.grad,'K'],['HV rise',hv.grad,'K'],['SC temperature LV',o.sc.windings[0].th1,'°C'],['SC temperature HV',o.sc.windings[1].th1,'°C'],['Hoop stress HV',o.sc.windings[1].sigma,'MPa'],['Noise estimate',o.noise,'dB(A)'],
     ['Core mass',o.wts.core,'kg'],['Total mass',o.wts.total,'kg'],['RM price (est.)',o.cost.total,'Rs']];
-  return {title,core,wind,perf,clr,wts,taps,coreSteps,steps:o.steps,warn:o.warn,checks:o.checks,gt,values};
+  const tender=tenderRows({fault:o.fault,inrush:o.inrush,bus1:o.bus1,bus2:o.bus2,busN:o.busN,neutralI:o.neutralI,harm:o.harm,Kf:o.Kf,ov:o.ov,riseOv:[o.lvRiseOv,o.hvRiseOv],worst:null});
+  return {title,core,wind,perf,clr,wts,taps,coreSteps,steps:o.steps,warn:o.warn,checks:o.checks,gt,values,tender};
 }
 
 function tbl(rows,head){ return '<table>'+(head?'<tr>'+head.map(h=>'<th>'+h+'</th>').join('')+'</tr>':'')+rows.map(r=>'<tr>'+r.map((c,i)=>i===0?'<th>'+esc(c)+'</th>':'<td>'+esc(c)+'</td>').join('')+'</tr>').join('')+'</table>'; }
@@ -451,7 +469,7 @@ function renderSheet(M){
   $('#sheet').innerHTML='<div class="titleblock"><div class="big">'+esc(t.title)+'</div>'+t.cells.map(c=>'<div><span>'+c[0]+'</span>'+esc(c[1])+'</div>').join('')+'</div>'+
   '<div class="cols"><div><h3>Winding data</h3>'+tbl(M.wind,['Parameter','LV (inner)','HV (outer)'])+'</div><div>'+
   '<h3>Core data</h3>'+tbl(M.core)+'<h3>Performance</h3>'+tbl(M.perf)+'<h3>Clearances</h3>'+tbl(M.clr)+'<h3>Dimensions and bill of mass</h3>'+tbl(M.wts)+
-  '<h3>HV tapping</h3>'+tbl(M.taps,['Tap','Setting','HV volts','Turns'])+'<h3>Core steps</h3>'+tbl(M.coreSteps,['Step','Width, mm','Stack, mm','Net area, mm²'])+'<h3>Core cutting list ('+esc(CUR.o.cut.type)+')</h3>'+tbl(cutRows(CUR.o.cut),['Part','Step','Width','Stack','Qty','Short / long, mm','kg'])+'<p class="hint">Calculated gross mass '+f1(CUR.o.cut.total,1)+' kg. Cut lengths follow the Sara core program (45° mitred, 3-blade).</p></div></div>';
+  '<h3>Tender calculations</h3>'+tbl(M.tender)+'<h3>HV tapping</h3>'+tbl(M.taps,['Tap','Setting','HV volts','Turns'])+'<h3>Core steps</h3>'+tbl(M.coreSteps,['Step','Width, mm','Stack, mm','Net area, mm²'])+'<h3>Core cutting list ('+esc(CUR.o.cut.type)+')</h3>'+tbl(cutRows(CUR.o.cut),['Part','Step','Width','Stack','Qty','Short / long, mm','kg'])+'<p class="hint">Calculated gross mass '+f1(CUR.o.cut.total,1)+' kg. Cut lengths follow the Sara core program (45° mitred, 3-blade).</p></div></div>';
   const grp={1:'Volts per turn',4:'Core',7:'LV winding',26:'HV winding',41:'Core weight and loss',43:'Impedance, enclosure and weights'};
   $('#steps').innerHTML='<table><tr><th>Step</th><th>Item</th><th>Working</th><th>Result</th></tr>'+M.steps.map(s=>(grp[s.n]?'<tr class="grp"><td colspan="4">'+grp[s.n]+'</td></tr>':'')+
     '<tr><td>'+s.n+'</td><td>'+esc(s.title)+'</td><td class="formula">'+esc(s.formula)+(s.note?'<span class="note">'+esc(s.note)+'</span>':'')+'</td><td class="r">'+esc(s.result)+'</td></tr>').join('')+'</table>';
@@ -524,14 +542,18 @@ function run(){
 }
 // GTP and alternatives (round core)
 function roundGtpData(o,m){ const p=o.inp, sq3=Math.sqrt(3), cn=c=>c==='D'?'delta':'star';
-  const taps=p.tapStep>0?('+'+p.tapPlus+' % to −'+p.tapMinus+' % in '+p.tapStep+' % steps ('+o.hv.nTaps+' positions)'):'No taps';
-  return {kVA:p.kVA,freq:p.freq,type:'Dry type, round core, class '+p.insClass,w1:{name:'LV',V:p.lvV,conn:cn(p.lvConn),I:p.kVA*1000/(sq3*p.lvV)},w2:{name:'HV',V:p.hvV,conn:cn(p.hvConn),I:p.kVA*1000/(sq3*p.hvV)},
-    vg:m.vg,cooling:'AN (natural air)',insClass:p.insClass,riseLim:o.riseLim,taps,tapChanger:p.tapChanger==='oltc'?'On-load (OLTC)':'Off-circuit',NLL:o.loss.NLL,LL:o.loss.LL,lead:o.loss.lead,T:p.refTemp,
-    Z:o.imp.ek,er:o.imp.er,ex:o.imp.ex,I0:o.nl.I0,rise1:o.lv.grad,rise2:o.hv.grad,B:o.core.B,J1:o.lv.J,J2:o.hv.Jmin,grade:'CRGO '+p.grade,mat:'LV '+p.lvMat+', HV '+p.hvMat,
+  const taps=p.tapStep>0?o.hv.taps.map(t=>Math.round(p.hvV*(1+t.pct/100))).filter(v=>v!==p.hvV).sort((a,b)=>a-b).join('-'):'';
+  return {kVA:p.kVA,freq:p.freq,phases:3,limbs:3,construction:'Core type, 3-phase 3-limb, stepped round core',customer:m.party,service:m.gService||('Dry type transformer, class '+p.insClass),ul:m.gUL,
+    w1:{name:'Secondary',V:p.lvV,conn:cn(p.lvConn),I:p.kVA*1000/(sq3*p.lvV)},w2:{name:'Primary',V:p.hvV,conn:cn(p.hvConn),I:p.kVA*1000/(sq3*p.hvV)},taps1:'',taps2:taps?taps+' (±'+p.tapPlus+'/'+p.tapMinus+' % in '+p.tapStep+' % steps)':'',
+    vg:m.vg,cooling:'Air natural (AN)',insClass:'Class '+p.insClass+' ('+({B:130,F:155,H:180}[p.insClass]||'')+' °C)',riseLim:o.riseLim,tapChanger:p.tapChanger==='oltc'?'On-load (OLTC)':'Off-circuit',
+    NLL:o.loss.NLL,LL:o.loss.LL,lead:o.loss.lead,T:p.refTemp,Z:o.imp.ek,er:o.imp.er,ex:o.imp.ex,I0:o.nl.I0,rise1:o.lv.grad,rise2:o.hv.grad,B:o.core.B,J1:o.lv.J,J2:o.hv.Jmin,grade:'CRGO '+p.grade,mat:'Primary '+p.hvMat+', secondary '+p.lvMat,
+    thd:o.harm?('THDi '+(o.harm.thd*100).toFixed(1)+' %, K-'+o.harm.K.toFixed(1)):'Linear load',
     mCore:o.wts.core,mCond:o.wts.lv+o.wts.hv,mTot:o.wts.total,dims:p.enclosure?(o.dims.eL+' × '+o.dims.eB+' × '+o.dims.eH+' (enclosure)'):(o.dims.activeL+' × '+o.dims.activeB+' × '+o.dims.activeH+' (active part)'),
-    testV:o.cls.pf+' kV / '+o.cls.li+' kVp',sc:o.sc.windings.every(w=>w.thermalOk)&&o.sc.windings[1].stressOk?'Complies':'See checks',noise:o.noise,toc:(p.capA||p.capB)?o.toc:null,std:'IS 11171 / IS 2026 / IEC 60076-11'}; }
+    testV:o.cls.pf+' kV / '+o.cls.li+' kVp',fault:(o.fault.Isc/1000).toFixed(2)+' / '+(o.fault.peak/1000).toFixed(2),inrush:Math.round(o.inrush.Ipk)+' ('+o.inrush.times.toFixed(1)+' × rated peak)',
+    sc:o.sc.windings.every(w=>w.thermalOk)&&o.sc.windings[1].stressOk?'Complies':'See design checks',noise:o.noise,shield:m.gShield,interlayer:m.gInterlayer,term1:m.gTerm2,term2:m.gTerm1,sensor:m.gSensor,
+    ambient:'Up to '+(p.amb??40)+' °C',humidity:m.gHumidity,ip:m.gIP||(p.enclosure?'IP23 (enclosure)':'IP00'),toc:(p.capA||p.capB)?o.toc:null,std:'IS 11171 / IS 2026 / IEC 60076-11'}; }
 $('#dlGtp').addEventListener('click',()=>{ if(!CUR) return; if($('#inputCheck').classList.contains('err')){ toast('Fix the highlighted inputs first.'); return; }
-  gtpPdf(roundGtpData(CUR.o,CUR.meta),{party:CUR.meta.party,wo:CUR.meta.wo,rev:CUR.meta.rev,by:CUR.meta.by,chk:CUR.meta.chk,appr:CUR.meta.appr},fname('pdf').replace(/\.pdf$/,'_GTP.pdf')); });
+  gtpPdf(roundGtpData(CUR.o,CUR.meta),CUR.meta,fname('pdf').replace(/\.pdf$/,'_GTP.pdf')); });
 function roundShowAlts(o){ const cols=[['Window',a=>a.window],['LV layers',a=>a.layers],['Ducts LV/HV',a=>a.lvDucts+' / '+a.hvDucts],['J LV/HV',a=>a.Jlv.toFixed(2)+' / '+a.Jhv.toFixed(2)],['Z %',a=>a.ek.toFixed(2)],['NLL W',a=>Math.round(a.NLL)],['LL W',a=>Math.round(a.LL)],['Rise K',a=>Math.round(a.rise)],['Price ₹',a=>Math.round(a.cost).toLocaleString('en-IN')]];
   if(o.inp.capA||o.inp.capB) cols.push(['TOC ₹',a=>Math.round(a.toc).toLocaleString('en-IN')]);
   renderAlts('#alts',o.auto&&(o.auto.window||o.auto.layers)?o.alts:null,cols,a=>{ const set=(k,v)=>{ if(form.elements[k]) form.elements[k].value=v; };
@@ -595,7 +617,8 @@ $('#dlPdf').addEventListener('click',async()=>{
   d.addPage(); pdfFit(d,(fs)=>{ title(d,'Design checks');
     d.autoTable({...B(fs),startY:15,margin:{left:8,right:8,bottom:9},head:[['Check','Requirement','Obtained','Result']],body:P(M.checks.map(c=>[c.name,c.req,c.got,c.ok?'Pass':'Fail'])),didParseCell:h=>pass(h,3)});
     d.setFont('helvetica','bold'); d.setFontSize(11); d.text('Guarantees and factory test results',8,d.lastAutoTable.finalY+8);
-    d.autoTable({...B(fs),startY:d.lastAutoTable.finalY+11,margin:{left:8,right:8,bottom:9},head:[['Item','Calculated','Guaranteed','Limit at test (IEC 60076-1)','Measured (FAT)','Result']],body:P(M.gt.map(r=>[r.item,r.calc,r.noG?'-':String(r.g),r.max,r.meas==null?'':String(r.meas),r.result])),didParseCell:h=>pass(h,5)}); });
+    d.autoTable({...B(fs),startY:d.lastAutoTable.finalY+11,margin:{left:8,right:8,bottom:9},head:[['Item','Calculated','Guaranteed','Limit at test (IEC 60076-1)','Measured (FAT)','Result']],body:P(M.gt.map(r=>[r.item,r.calc,r.noG?'-':String(r.g),r.max,r.meas==null?'':String(r.meas),r.result])),didParseCell:h=>pass(h,5)});
+    d.autoTable({...B(fs),startY:d.lastAutoTable.finalY+4,margin:{left:8,right:8,bottom:9},head:[['Tender calculations','']],body:P(M.tender)}); });
   // page 3+: steps, then core steps, taps and clearances
   d.addPage(); pdfFit(d,(fs)=>{ title(d,'Step-by-step calculation');
     d.autoTable({...B(fs),startY:15,margin:{left:8,right:8,bottom:9},head:[['Step','Item','Working','Result']],body:M.steps.map(s=>[String(s.n),pdfText(s.title),pdfText(s.formula+(s.note?'  ['+s.note+']':'')),pdfText(s.result)]),
@@ -617,7 +640,8 @@ $('#dlXlsx').addEventListener('click',()=>{
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Step','Width mm','Stack mm','Net area mm2'],...M.coreSteps]),'Core steps');
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Tap','Setting','HV volts','Turns'],...M.taps]),'Taps');
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Part','Step','Width mm','Stack mm','Qty','Short mm','Long mm','kg'],...CUR.o.cut.rows.map(x=>[x.grp,x.step,x.w,Math.round(x.stack*10)/10,x.qty,Math.round(x.short),Math.round(x.long),Math.round(x.kg*10)/10]),['Total','','','','','','',Math.round(CUR.o.cut.total*10)/10]]),'Core cutting');
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['#','Particular','Unit','Value'],...gtpRows(roundGtpData(CUR.o,CUR.meta))]),'GTP');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Sl. No.','Description','Unit','Particulars'],...gtpRows(roundGtpData(CUR.o,CUR.meta)).map(x=>x.slice(0,4))]),'GTP');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Item','Value'],...M.tender]),'Tender calcs');
   if(CUR.o.alts) XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Window mm','LV layers','LV/HV ducts','J LV/HV','Z %','NLL W','LL W','Eff %','Rise K','Mass kg','Price','TOC','Failed checks'],...CUR.o.alts.map(a=>[a.window,a.layers,a.lvDucts+'/'+a.hvDucts,a.Jlv.toFixed(2)+'/'+a.Jhv.toFixed(2),+a.ek.toFixed(3),Math.round(a.NLL),Math.round(a.LL),+a.eff.toFixed(2),+a.rise.toFixed(1),Math.round(a.mass),Math.round(a.cost),Math.round(a.toc),a.fails])]),'Alternatives');
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Check','Requirement','Obtained','Result'],...M.checks.map(c=>[c.name,c.req,c.got,c.ok?'Pass':'Fail'])]),'Checks');
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Quantity','Value','Unit'],...M.values.map(r=>[r[0],typeof r[1]==='number'?Math.round(r[1]*1e6)/1e6:r[1],r[2]])]),'Values');

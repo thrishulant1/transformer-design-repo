@@ -3,6 +3,7 @@
   <div class="presets" aria-label="Load a reference design">
     <button class="btn sm" data-rpreset="sheet70">Your 70 kVA sheet</button>
     <button class="btn sm" data-rpreset="auto70">70 kVA auto design</button>
+    <button class="btn sm wide" data-rpreset="p4kva">4 kVA single-phase example (Fimer GTP)</button>
     <label class="btn sm filebtn wide">Import requirement sheet (.xlsx)<input type="file" id="reqFile" accept=".xlsx,.xls,.csv" hidden></label>
   </div>
   <div class="saved" aria-label="Saved designs">
@@ -23,7 +24,10 @@
       <label><b>Frequency, Hz <span class="req">*</span></b><select name="freq"><option>50</option><option>60</option></select></label>
       <label><b>Primary voltage, V <span class="req">*</span></b><input name="priV" type="number" step="any"></label>
       <label><b>Secondary voltage, V <span class="req">*</span></b><input name="secV" type="number" step="any"></label>
-      <label><b>Vector group <span class="req">*</span></b><select name="vg"><option>Dyn11</option><option>Dyn1</option><option>Dyn5</option><option>Yyn0</option><option>Ynd11</option><option>Yd11</option><option>Dd0</option></select></label>
+      <label><b>Vector group <span class="req">*</span></b><select name="vg"><option>Dyn11</option><option value="Ii0">Ii0 (single-phase)</option><option>Dyn1</option><option>Dyn5</option><option>Yyn0</option><option>Ynd11</option><option>Yd11</option><option>Dd0</option></select></label>
+      <label><b>Phases <span class="req">*</span></b><select name="phases"><option value="3">3-phase (3 limbs)</option><option value="1">Single-phase (2 limbs)</option></select></label>
+      <label><b>Primary taps, V</b><input name="priTaps" placeholder="e.g. 600, 630, 660"></label>
+      <label><b>Secondary taps, V</b><input name="secTaps" placeholder="e.g. 100, 115, 175"></label>
       <label><b>Winding material <span class="req">*</span></b><select name="mat"><option value="Al">Aluminium</option><option value="Cu">Copper</option></select></label>
       <label><b>Impedance, % <span class="req">*</span></b><input name="zTarget" type="number" step="0.01"></label>
       <label><b>Tolerance +% / −%</b><span class="pair"><input name="zTolPlus" type="number" step="0.5" aria-label="plus tolerance"><input name="zTolMinus" type="number" step="0.5" aria-label="minus tolerance"></span></label>
@@ -44,6 +48,9 @@
       <label><b>Load K-factor</b><input name="kFactor" type="number" step="1" min="1" title="1 = linear loads; K-4, K-13 for non-linear loads"></label>
       <label><b>System fault level, MVA</b><input name="faultMVA" type="number" step="any" min="0" placeholder="infinite bus"></label>
       <label><b>Short-circuit duration, s</b><input name="scTime" type="number" step="0.5" min="0.25"></label>
+      <label class="full"><b>Harmonic current spectrum</b><input name="harmonics" placeholder="order:% of fundamental, e.g. 5:25, 7:14, 11:6, 13:4" title="Leave blank for linear loads or to use the K-factor field"></label>
+      <label><b>Continuous overload, %</b><input name="overload" type="number" step="1" min="0" placeholder="0"></label>
+      <label><b>Max overall L × B × H, mm</b><span class="pair"><input name="maxL" type="number" aria-label="maximum length" placeholder="L"><input name="maxB" type="number" aria-label="maximum breadth" placeholder="B"><input name="maxH" type="number" aria-label="maximum height" placeholder="H"></span></label>
       <label class="full"><b>Short-circuit withstand in auto design</b><select name="scRequired"><option value="0">Check and report only</option><option value="1">Required: auto design must pass (lowers current density)</option></select></label>
       <label><b>Environmental / climatic</b><span class="pair"><select name="envClass" aria-label="Environmental class"><option>E0</option><option>E1</option><option selected>E2</option></select><select name="climClass" aria-label="Climatic class"><option>C1</option><option selected>C2</option></select></span></label>
       <label><b>Fire behaviour</b><select name="fireClass"><option>F0</option><option selected>F1</option></select></label>
@@ -141,6 +148,20 @@
       <label><b>Class H insulation</b><input name="pClh" type="number"></label>
       <label><b>Resin</b><input name="pResin" type="number"></label>
       <label><b>Others, %</b><input name="pOthers" type="number"></label>
+    </div>
+  </details>
+  <details class="sec">
+    <summary>GTP details <small>text shown on the GTP</small></summary>
+    <div class="grid2">
+      <label class="full"><b>Service / type</b><input name="gService" placeholder="e.g. Indoor, VPI process dry type auxiliary transformer"></label>
+      <label><b>UL / certification file</b><input name="gUL" placeholder="optional"></label>
+      <label><b>Electrostatic shield</b><input name="gShield" placeholder="e.g. Copper, between windings"></label>
+      <label><b>Interlayer insulation</b><input name="gInterlayer" placeholder="e.g. NPN / Nomex"></label>
+      <label><b>Temperature sensor</b><input name="gSensor" placeholder="e.g. PT100 / thermistor 130 °C"></label>
+      <label><b>Primary termination</b><input name="gTerm1" placeholder="e.g. 6 mm² connector"></label>
+      <label><b>Secondary termination</b><input name="gTerm2" placeholder="e.g. 16 mm² connector"></label>
+      <label><b>Humidity</b><input name="gHumidity" placeholder="e.g. 95 % non-condensing"></label>
+      <label><b>Ingress protection</b><input name="gIP" placeholder="e.g. IP00 / IP23"></label>
     </div>
   </details>
   <details class="sec">
